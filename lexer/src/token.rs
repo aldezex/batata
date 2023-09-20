@@ -35,6 +35,11 @@ pub enum Token {
     Let,
     Const,
     Var,
+    If,
+    Else,
+    Return,
+    Async,
+    Await,
 }
 
 impl Display for Token {
@@ -76,6 +81,11 @@ impl Display for Token {
             Let => write!(f, "Let"),
             Const => write!(f, "Const"),
             Var => write!(f, "Var"),
+            If => write!(f, "If"),
+            Else => write!(f, "Else"),
+            Return => write!(f, "Return"),
+            Async => write!(f, "Async"),
+            Await => write!(f, "Await"),
         }
     }
 }

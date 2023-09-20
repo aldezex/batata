@@ -95,6 +95,11 @@ impl Lexer {
                     "var" => Var,
                     "const" => Const,
                     "function" => Function,
+                    "if" => If,
+                    "else" => Else,
+                    "return" => Return,
+                    "async" => Async,
+                    "await" => Await,
                     _ => return Ok(Ident(identifier)),
                 });
             }
@@ -285,6 +290,42 @@ mod tests {
         let input = ">=";
         let mut lexer = Lexer::new(input.into());
         let tokens = vec![GreaterThanEqual];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn keywords() -> Result<()> {
+        let input = r#"
+            const alvaro
+            let tata
+            var macarena;
+            if else
+            return
+            async await
+        "#;
+        let mut lexer = Lexer::new(input.into());
+
+        let tokens = vec![
+            Const,
+            Ident("alvaro".into()),
+            Let,
+            Ident("tata".into()),
+            Var,
+            Ident("macarena".into()),
+            Semicolon,
+            If,
+            Else,
+            Return,
+            Async,
+            Await,
+        ];
 
         for token in tokens {
             let tok = lexer.next_token()?;
