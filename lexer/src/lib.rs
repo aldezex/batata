@@ -43,7 +43,40 @@ impl Lexer {
         let token = match self.ch {
             0 => Eof,
 
-            b'=' => Assign,
+            b'=' => {
+                if self.peek() == b'=' {
+                    self.read_char();
+
+                    if self.peek() == b'=' {
+                        return Ok(StrictEqual);
+                    }
+
+                    return Ok(Equal);
+                }
+
+                return Ok(Assign);
+            }
+
+            b'>' => {
+                if self.peek() == b'=' {
+                    self.read_char();
+
+                    return Ok(GreaterThanEqual);
+                }
+
+                GreaterThan
+            }
+
+            b'<' => {
+                if self.peek() == b'=' {
+                    self.read_char();
+
+                    return Ok(LessThanEqual);
+                }
+
+                LessThan
+            }
+
             b'+' => Plus,
 
             b',' => Comma,
@@ -102,6 +135,14 @@ impl Lexer {
         while self.ch.is_ascii_whitespace() {
             self.read_char();
         }
+    }
+
+    fn peek(&self) -> u8 {
+        if self.read_position >= self.input.len() {
+            return 0;
+        }
+
+        self.input[self.read_position]
     }
 }
 
@@ -169,6 +210,81 @@ mod tests {
             Semicolon,
             Eof,
         ];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn comparators() -> Result<()> {
+        let input = "=";
+        let mut lexer = Lexer::new(input.into());
+        let tokens = vec![Assign];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        let input = "==";
+        let mut lexer = Lexer::new(input.into());
+        let tokens = vec![Equal];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        let input = "===";
+        let mut lexer = Lexer::new(input.into());
+        let tokens = vec![StrictEqual];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        let input = "<";
+        let mut lexer = Lexer::new(input.into());
+        let tokens = vec![LessThan];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        let input = ">";
+        let mut lexer = Lexer::new(input.into());
+        let tokens = vec![GreaterThan];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        let input = "<=";
+        let mut lexer = Lexer::new(input.into());
+        let tokens = vec![LessThanEqual];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        let input = ">=";
+        let mut lexer = Lexer::new(input.into());
+        let tokens = vec![GreaterThanEqual];
 
         for token in tokens {
             let tok = lexer.next_token()?;

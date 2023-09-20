@@ -11,6 +11,17 @@ pub enum Token {
 
     Assign,
     Plus,
+    Minus,
+    Asterisk,
+    Slash,
+    Bang,
+
+    Equal,
+    StrictEqual,
+    LessThan,
+    GreaterThan,
+    LessThanEqual,
+    GreaterThanEqual,
 
     Comma,
     Semicolon,
@@ -40,6 +51,18 @@ impl Display for Token {
 
             Assign => write!(f, "Assign"),
             Plus => write!(f, "Plus"),
+            Minus => write!(f, "Minus"),
+            Asterisk => write!(f, "Asterisk"),
+            Slash => write!(f, "Slash"),
+
+            Bang => write!(f, "Bang"),
+
+            Equal => write!(f, "Equal"),
+            StrictEqual => write!(f, "StrictEqual"),
+            LessThan => write!(f, "LessThan"),
+            GreaterThan => write!(f, "GreaterThan"),
+            LessThanEqual => write!(f, "LessThanEqual"),
+            GreaterThanEqual => write!(f, "GreaterThanEqual"),
 
             Comma => write!(f, "Comma"),
             Semicolon => write!(f, "Semicolon"),
