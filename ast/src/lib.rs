@@ -71,12 +71,27 @@ impl std::fmt::Display for Identifier {
 #[derive(Debug, PartialEq)]
 pub enum Expression {
     IntegerLiteral(i64),
+    Prefix(Prefix),
 }
 
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Expression::IntegerLiteral(expression) => write!(f, "{}", expression),
+            Expression::Prefix(expression) => write!(f, "{}", expression),
         }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Prefix {
+    pub token: Token,
+    pub operator: String,
+    pub right: Box<Expression>,
+}
+
+impl std::fmt::Display for Prefix {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.token)
     }
 }

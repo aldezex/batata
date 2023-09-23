@@ -2,7 +2,7 @@ use std::mem;
 
 use anyhow::{Ok, Result};
 
-use ast::{Expression, Identifier, LetStatement, Program, ReturnStatement, Statement};
+use ast::{Expression, Identifier, LetStatement, Prefix, Program, ReturnStatement, Statement};
 use lexer::{token::Token, Lexer};
 
 // type PrefixParseFn = fn() -> Result<Expression>;
@@ -135,17 +135,33 @@ impl Parser {
         Ok(Statement::ExpressionStatement(expression))
     }
 
-    fn parse_expression(&self, precedence: Precedence) -> Result<Expression> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression> {
         // self.prefix_parse_fns[&self.current_token]()
 
         match self.current_token {
             Token::Int(_) => self.parse_integer_literal(),
+            Token::Bang | Token::Minus => self.parse_prefix_expression(),
             _ => Err(anyhow::anyhow!("failed to parse expression")),
         }
     }
 
     fn parse_integer_literal(&self) -> Result<Expression> {
         let exp = Expression::IntegerLiteral(self.current_token.literal().parse()?);
+        Ok(exp)
+    }
+
+    fn parse_prefix_expression(&mut self) -> Result<Expression> {
+        let lit = self.current_token.literal();
+        let curr = self.current_token.clone();
+
+        self.step()?;
+
+        let exp = Expression::Prefix(Prefix {
+            token: curr,
+            operator: lit,
+            right: Box::new(self.parse_expression(Precedence::Prefix)?),
+        });
+
         Ok(exp)
     }
 
@@ -294,6 +310,44 @@ mod tests {
                     );
                 }
                 _ => panic!("expected let statement"),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_prefix() -> Result<()> {
+        let input = r#"
+            !5;
+            -15;
+        "#;
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+        assert_eq!(program.statements.len(), 2);
+
+        let prefix = [
+            Expression::Prefix(Prefix {
+                token: Token::Bang,
+                operator: "!".to_string(),
+                right: Box::new(Expression::IntegerLiteral(5)),
+            }),
+            Expression::Prefix(Prefix {
+                token: Token::Minus,
+                operator: "-".to_string(),
+                right: Box::new(Expression::IntegerLiteral(15)),
+            }),
+        ];
+
+        for (index, statement) in program.statements.iter().enumerate() {
+            match statement {
+                Statement::ExpressionStatement(expression) => {
+                    assert_eq!(expression, &prefix[index]);
+                }
+                _ => panic!("expected expression statement"),
             }
         }
 

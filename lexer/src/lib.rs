@@ -83,6 +83,8 @@ impl Lexer {
             }
 
             b'+' => Plus,
+            b'-' => Minus,
+            b'!' => Bang,
 
             b',' => Comma,
             b';' => Semicolon,

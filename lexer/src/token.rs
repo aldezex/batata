@@ -108,6 +108,8 @@ impl Token {
             // Float(fl) => fl.to_string(),
             Return => "return".to_string(),
             Str(s) => s.clone(),
+            Bang => "!".to_string(),
+            Minus => "-".to_string(),
             _ => String::new(),
         }
     }
