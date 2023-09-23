@@ -6,8 +6,9 @@ pub enum Token {
     Eof,
 
     Ident(String),
-    Int(String),
-    Float(String),
+    Int(isize),
+    Float(f32),
+    Str(String),
 
     Assign,
     Plus,
@@ -40,6 +41,9 @@ pub enum Token {
     Return,
     Async,
     Await,
+
+    DoubleQuote,
+    SingleQuote,
 }
 
 impl Display for Token {
@@ -53,6 +57,7 @@ impl Display for Token {
             Ident(s) => write!(f, "Ident({})", s),
             Int(i) => write!(f, "Int({})", i),
             Float(fl) => write!(f, "Float({})", fl),
+            Str(s) => write!(f, "Str({})", s),
 
             Assign => write!(f, "Assign"),
             Plus => write!(f, "Plus"),
@@ -86,6 +91,9 @@ impl Display for Token {
             Return => write!(f, "Return"),
             Async => write!(f, "Async"),
             Await => write!(f, "Await"),
+
+            DoubleQuote => write!(f, "DoubleQuote"),
+            SingleQuote => write!(f, "SingleQuote"),
         }
     }
 }
@@ -96,9 +104,10 @@ impl Token {
 
         match self {
             Ident(s) => s.clone(),
-            Int(i) => i.clone(),
-            Float(fl) => fl.clone(),
+            Int(i) => i.to_string(),
+            Float(fl) => fl.to_string(),
             Return => "return".to_string(),
+            Str(s) => s.clone(),
             _ => String::new(),
         }
     }

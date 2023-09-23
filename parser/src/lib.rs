@@ -150,19 +150,27 @@ mod tests {
         let input = r#"
             return;
             return 5;
+            return "hello";
+            return 'world';
         "#;
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer)?;
 
         let program = parser.parse_program()?;
-        assert_eq!(program.statements.len(), 2);
+        assert_eq!(program.statements.len(), 4);
 
         let returns = [
             ReturnStatement {
                 token: Token::Semicolon,
             },
             ReturnStatement {
-                token: Token::Int("5".into()),
+                token: Token::Int(5),
+            },
+            ReturnStatement {
+                token: Token::Str("hello".to_string()),
+            },
+            ReturnStatement {
+                token: Token::Str("world".to_string()),
             },
         ];
 
