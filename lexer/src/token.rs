@@ -18,6 +18,7 @@ pub enum Token {
     Bang,
 
     Equal,
+    NotEqual,
     StrictEqual,
     LessThan,
     GreaterThan,
@@ -68,6 +69,7 @@ impl Display for Token {
             Bang => write!(f, "bang"),
 
             Equal => write!(f, "equal"),
+            NotEqual => write!(f, "notEqual"),
             StrictEqual => write!(f, "strictEqual"),
             LessThan => write!(f, "lessThan"),
             GreaterThan => write!(f, "greaterThan"),
@@ -110,6 +112,16 @@ impl Token {
             Str(s) => s.clone(),
             Bang => "!".to_string(),
             Minus => "-".to_string(),
+            Slash => "/".to_string(),
+            Asterisk => "*".to_string(),
+            Plus => "+".to_string(),
+            Equal => "==".to_string(),
+            NotEqual => "!=".to_string(),
+            StrictEqual => "===".to_string(),
+            LessThan => "<".to_string(),
+            GreaterThan => ">".to_string(),
+            LessThanEqual => "<=".to_string(),
+            GreaterThanEqual => ">=".to_string(),
             _ => String::new(),
         }
     }

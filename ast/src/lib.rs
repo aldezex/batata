@@ -56,7 +56,7 @@ impl std::fmt::Display for ReturnStatement {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct Identifier {
     pub token: String,
     pub value: String,
@@ -70,15 +70,21 @@ impl std::fmt::Display for Identifier {
 
 #[derive(Debug, PartialEq)]
 pub enum Expression {
+    Identifier(Identifier),
     IntegerLiteral(i64),
     Prefix(Prefix),
+    Infix(Infix),
+    Empty,
 }
 
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            Expression::Identifier(expression) => write!(f, "{}", expression),
             Expression::IntegerLiteral(expression) => write!(f, "{}", expression),
             Expression::Prefix(expression) => write!(f, "{}", expression),
+            Expression::Infix(expression) => write!(f, "{}", expression),
+            Expression::Empty => write!(f, ""),
         }
     }
 }
@@ -92,6 +98,20 @@ pub struct Prefix {
 
 impl std::fmt::Display for Prefix {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.token)
+        write!(f, "({}{})", self.operator, self.right)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Infix {
+    pub token: Token,
+    pub left: Box<Expression>,
+    pub operator: String,
+    pub right: Box<Expression>,
+}
+
+impl std::fmt::Display for Infix {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "({} {} {})", self.left, self.operator, self.right)
     }
 }
