@@ -89,3 +89,16 @@ impl Display for Token {
         }
     }
 }
+
+impl Token {
+    pub fn literal(&self) -> String {
+        use Token::*;
+
+        match self {
+            Ident(s) => s.clone(),
+            Int(i) => i.clone(),
+            Float(fl) => fl.clone(),
+            _ => String::new(),
+        }
+    }
+}

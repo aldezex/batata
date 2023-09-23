@@ -3,7 +3,7 @@ use token::Token;
 
 pub mod token;
 
-struct Lexer {
+pub struct Lexer {
     input: Vec<u8>,
     position: usize,
     read_position: usize,
