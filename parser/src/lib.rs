@@ -2,7 +2,7 @@ use std::mem;
 
 use anyhow::{Ok, Result};
 
-use ast::{Identifier, LetStatement, Program, Statement};
+use ast::{Expression, Identifier, LetStatement, Program, ReturnStatement, Statement};
 use lexer::{token::Token, Lexer};
 
 struct Parser {
@@ -40,6 +40,7 @@ impl Parser {
     fn parse_statement(&mut self) -> Result<Statement> {
         match self.current_token {
             Token::Let => self.parse_let_statement(),
+            Token::Return => self.parse_return_statement(),
             _ => unimplemented!(),
         }
     }
@@ -74,20 +75,17 @@ impl Parser {
         statement
     }
 
-    // fn expect_peek(&mut self, token: Token) -> Result<bool> {
-    //     if self.peek_token_is(token) {
-    //         self.step()?;
-    //         Ok(true)
-    //     } else {
-    //         Ok(false)
-    //     }
-    // }
+    fn parse_return_statement(&mut self) -> Result<Statement> {
+        let return_statement = Ok(Statement::ReturnStatement(ReturnStatement {
+            token: self.next_token.clone(),
+        }));
 
-    // fn peek_token_is(&self, token: Token) -> bool {
-    //     println!("peek_token_is: {:?} == {:?}", self.next_token, token);
+        while !self.current_token_is(Token::Semicolon) {
+            self.step()?;
+        }
 
-    //     self.next_token == token
-    // }
+        return_statement
+    }
 
     fn step(&mut self) -> Result<()> {
         self.current_token = self.lexer.next_token()?;
@@ -98,6 +96,21 @@ impl Parser {
 
     fn current_token_is(&self, token: Token) -> bool {
         self.current_token == token
+    }
+
+    // fn expect_peek(&mut self, token: Token) -> Result<bool> {
+    //     if self.peek_token_is(token) {
+    //         self.step()?;
+    //         Ok(true)
+    //     } else {
+    //         Ok(false)
+    //     }
+    // }
+
+    fn peek_token_is(&self, token: Token) -> bool {
+        println!("peek_token_is: {:?} == {:?}", self.next_token, token);
+
+        self.next_token == token
     }
 }
 
@@ -125,6 +138,40 @@ mod tests {
                     assert_eq!(let_statement.token, Token::Let);
                     assert!(let_statement.name.value == names[index]);
                 }
+                _ => panic!("expected let statement"),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_return_statement() -> Result<()> {
+        let input = r#"
+            return;
+            return 5;
+        "#;
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+        assert_eq!(program.statements.len(), 2);
+
+        let returns = [
+            ReturnStatement {
+                token: Token::Semicolon,
+            },
+            ReturnStatement {
+                token: Token::Int("5".into()),
+            },
+        ];
+
+        for (index, statement) in program.statements.iter().enumerate() {
+            match statement {
+                Statement::ReturnStatement(return_statement) => {
+                    assert_eq!(return_statement.token, returns[index].token);
+                }
+                _ => panic!("expected return statement"),
             }
         }
 

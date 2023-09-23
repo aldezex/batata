@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter, Result};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Illegal,
     Eof,
@@ -98,6 +98,7 @@ impl Token {
             Ident(s) => s.clone(),
             Int(i) => i.clone(),
             Float(fl) => fl.clone(),
+            Return => "return".to_string(),
             _ => String::new(),
         }
     }
