@@ -2,7 +2,7 @@ use std::mem;
 
 use anyhow::{Ok, Result};
 
-use ast::{Expression, Identifier, LetStatement, Program, ReturnStatement, Statement};
+use ast::{Identifier, LetStatement, Program, ReturnStatement, Statement};
 use lexer::{token::Token, Lexer};
 
 struct Parser {
@@ -41,6 +41,7 @@ impl Parser {
         match self.current_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
+            // _ => self.parse_expression_statement(),
             _ => unimplemented!(),
         }
     }
@@ -63,9 +64,7 @@ impl Parser {
         };
 
         let statement = Ok(Statement::LetStatement(LetStatement {
-            token: Token::Let,
-            name,
-            value: None,
+            identifier: name.value,
         }));
 
         while !self.current_token_is(Token::Semicolon) {
@@ -86,6 +85,8 @@ impl Parser {
 
         return_statement
     }
+
+    // fn parse_expression_statement(&mut self) -> Result<Statement> {}
 
     fn step(&mut self) -> Result<()> {
         self.current_token = self.lexer.next_token()?;
@@ -135,8 +136,7 @@ mod tests {
         for (index, statement) in program.statements.iter().enumerate() {
             match statement {
                 Statement::LetStatement(let_statement) => {
-                    assert_eq!(let_statement.token, Token::Let);
-                    assert!(let_statement.name.value == names[index]);
+                    assert_eq!(let_statement.identifier, names[index]);
                 }
                 _ => panic!("expected let statement"),
             }
@@ -152,12 +152,13 @@ mod tests {
             return 5;
             return "hello";
             return 'world';
+            return 5 + 5;
         "#;
         let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer)?;
 
         let program = parser.parse_program()?;
-        assert_eq!(program.statements.len(), 4);
+        assert_eq!(program.statements.len(), 5);
 
         let returns = [
             ReturnStatement {
@@ -171,6 +172,9 @@ mod tests {
             },
             ReturnStatement {
                 token: Token::Str("world".to_string()),
+            },
+            ReturnStatement {
+                token: Token::Int(5),
             },
         ];
 
