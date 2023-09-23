@@ -44,45 +44,64 @@ impl Lexer {
             0 => Eof,
 
             b'=' => {
-                self.read_char();
+                if self.peek() == b'=' {
+                    self.read_char();
 
-                if self.ch == b'=' {
                     if self.peek() == b'=' {
                         self.read_char();
                         return Ok(StrictEqual);
                     }
 
+                    self.read_char();
+
                     return Ok(Equal);
                 }
+
+                self.read_char();
 
                 return Ok(Assign);
             }
 
             b'>' => {
-                self.read_char();
-
-                if self.ch == b'=' {
+                if self.peek() == b'=' {
+                    self.read_char();
                     self.read_char();
 
                     return Ok(GreaterThanEqual);
                 }
 
-                return Ok(GreaterThan);
-            }
-
-            b'<' => {
                 self.read_char();
 
-                if self.ch == b'=' {
+                return Ok(GreaterThan);
+            }
+            b'<' => {
+                if self.peek() == b'=' {
+                    self.read_char();
                     self.read_char();
 
                     return Ok(LessThanEqual);
                 }
 
+                self.read_char();
+
                 return Ok(LessThan);
             }
 
             b'+' => Plus,
+            b'-' => Minus,
+            b'*' => Asterisk,
+            b'/' => Slash,
+            b'!' => {
+                if self.peek() == b'=' {
+                    self.read_char();
+                    self.read_char();
+
+                    return Ok(NotEqual);
+                }
+
+                self.read_char();
+                return Ok(Bang);
+            }
 
             b',' => Comma,
             b';' => Semicolon,
@@ -111,7 +130,37 @@ impl Lexer {
 
             b'0'..=b'9' => {
                 let number = self.read_number();
-                return Ok(Int(number));
+                return Ok(Token::Int(number.parse::<isize>().unwrap()));
+            }
+
+            b'"' => {
+                self.read_char();
+
+                let mut string = String::new();
+
+                while self.ch != b'"' {
+                    string.push(self.ch as char);
+                    self.read_char();
+                }
+
+                self.read_char();
+
+                return Ok(Token::Str(string));
+            }
+
+            b'\'' => {
+                self.read_char();
+
+                let mut string = String::new();
+
+                while self.ch != b'\'' {
+                    string.push(self.ch as char);
+                    self.read_char();
+                }
+
+                self.read_char();
+
+                return Ok(Token::Str(string));
             }
 
             _ => Illegal,
@@ -195,12 +244,12 @@ mod tests {
             Let,
             Ident("five".into()),
             Assign,
-            Int("5".into()),
+            Int(5),
             Semicolon,
             Let,
             Ident("ten".into()),
             Assign,
-            Int("10".into()),
+            Int(10),
             Semicolon,
             Let,
             Ident("add".into()),
@@ -331,6 +380,43 @@ mod tests {
             Async,
             Await,
         ];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_strings() -> Result<()> {
+        let input = r#"
+            "hello world"
+            'hello world'
+        "#;
+        let mut lexer = Lexer::new(input.into());
+
+        let tokens = vec![Str("hello world".into()), Str("hello world".into())];
+
+        for token in tokens {
+            let tok = lexer.next_token()?;
+            println!("Expected: {}, got: {}", token, tok);
+            assert_eq!(tok, token);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn integer_literals_equal() -> Result<()> {
+        let input = r#"
+            5 == 5;
+        "#;
+        let mut lexer = Lexer::new(input.into());
+
+        let tokens = vec![Int(5), Equal, Int(5), Semicolon, Eof];
 
         for token in tokens {
             let tok = lexer.next_token()?;

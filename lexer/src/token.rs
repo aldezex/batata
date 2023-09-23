@@ -1,13 +1,14 @@
 use std::fmt::{Display, Formatter, Result};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash)]
 pub enum Token {
     Illegal,
     Eof,
 
     Ident(String),
-    Int(String),
-    Float(String),
+    Int(isize),
+    // Float(f32),
+    Str(String),
 
     Assign,
     Plus,
@@ -17,6 +18,7 @@ pub enum Token {
     Bang,
 
     Equal,
+    NotEqual,
     StrictEqual,
     LessThan,
     GreaterThan,
@@ -40,6 +42,9 @@ pub enum Token {
     Return,
     Async,
     Await,
+
+    DoubleQuote,
+    SingleQuote,
 }
 
 impl Display for Token {
@@ -47,45 +52,50 @@ impl Display for Token {
         use Token::*;
 
         match self {
-            Illegal => write!(f, "Illegal"),
-            Eof => write!(f, "EOF"),
+            Illegal => write!(f, "illegal"),
+            Eof => write!(f, "eof"),
 
-            Ident(s) => write!(f, "Ident({})", s),
-            Int(i) => write!(f, "Int({})", i),
-            Float(fl) => write!(f, "Float({})", fl),
+            Ident(s) => write!(f, "ident({})", s),
+            Int(i) => write!(f, "int({})", i),
+            // Float(fl) => write!(f, "float({})", fl),
+            Str(s) => write!(f, "str({})", s),
 
-            Assign => write!(f, "Assign"),
-            Plus => write!(f, "Plus"),
-            Minus => write!(f, "Minus"),
-            Asterisk => write!(f, "Asterisk"),
-            Slash => write!(f, "Slash"),
+            Assign => write!(f, "assign"),
+            Plus => write!(f, "plus"),
+            Minus => write!(f, "minus"),
+            Asterisk => write!(f, "asterisk"),
+            Slash => write!(f, "slash"),
 
-            Bang => write!(f, "Bang"),
+            Bang => write!(f, "bang"),
 
-            Equal => write!(f, "Equal"),
-            StrictEqual => write!(f, "StrictEqual"),
-            LessThan => write!(f, "LessThan"),
-            GreaterThan => write!(f, "GreaterThan"),
-            LessThanEqual => write!(f, "LessThanEqual"),
-            GreaterThanEqual => write!(f, "GreaterThanEqual"),
+            Equal => write!(f, "equal"),
+            NotEqual => write!(f, "notEqual"),
+            StrictEqual => write!(f, "strictEqual"),
+            LessThan => write!(f, "lessThan"),
+            GreaterThan => write!(f, "greaterThan"),
+            LessThanEqual => write!(f, "lessThanEqual"),
+            GreaterThanEqual => write!(f, "greaterThanEqual"),
 
-            Comma => write!(f, "Comma"),
-            Semicolon => write!(f, "Semicolon"),
+            Comma => write!(f, "comma"),
+            Semicolon => write!(f, "semicolon"),
 
-            Lparen => write!(f, "Lparen"),
-            Rparen => write!(f, "Rparen"),
-            Lbrace => write!(f, "Lbrace"),
-            Rbrace => write!(f, "Rbrace"),
+            Lparen => write!(f, "lparen"),
+            Rparen => write!(f, "rparen"),
+            Lbrace => write!(f, "lbrace"),
+            Rbrace => write!(f, "rbrace"),
 
-            Function => write!(f, "Function"),
-            Let => write!(f, "Let"),
-            Const => write!(f, "Const"),
-            Var => write!(f, "Var"),
-            If => write!(f, "If"),
-            Else => write!(f, "Else"),
-            Return => write!(f, "Return"),
-            Async => write!(f, "Async"),
-            Await => write!(f, "Await"),
+            Function => write!(f, "function"),
+            Let => write!(f, "let"),
+            Const => write!(f, "const"),
+            Var => write!(f, "var"),
+            If => write!(f, "if"),
+            Else => write!(f, "else"),
+            Return => write!(f, "return"),
+            Async => write!(f, "async"),
+            Await => write!(f, "await"),
+
+            DoubleQuote => write!(f, "doubleQuote"),
+            SingleQuote => write!(f, "singleQuote"),
         }
     }
 }
@@ -96,8 +106,22 @@ impl Token {
 
         match self {
             Ident(s) => s.clone(),
-            Int(i) => i.clone(),
-            Float(fl) => fl.clone(),
+            Int(i) => i.to_string(),
+            // Float(fl) => fl.to_string(),
+            Return => "return".to_string(),
+            Str(s) => s.clone(),
+            Bang => "!".to_string(),
+            Minus => "-".to_string(),
+            Slash => "/".to_string(),
+            Asterisk => "*".to_string(),
+            Plus => "+".to_string(),
+            Equal => "==".to_string(),
+            NotEqual => "!=".to_string(),
+            StrictEqual => "===".to_string(),
+            LessThan => "<".to_string(),
+            GreaterThan => ">".to_string(),
+            LessThanEqual => "<=".to_string(),
+            GreaterThanEqual => ">=".to_string(),
             _ => String::new(),
         }
     }
