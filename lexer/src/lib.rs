@@ -44,10 +44,11 @@ impl Lexer {
             0 => Eof,
 
             b'=' => {
-                if self.peek() == b'=' {
-                    self.read_char();
+                self.read_char();
 
+                if self.ch == b'=' {
                     if self.peek() == b'=' {
+                        self.read_char();
                         return Ok(StrictEqual);
                     }
 
@@ -58,23 +59,27 @@ impl Lexer {
             }
 
             b'>' => {
-                if self.peek() == b'=' {
+                self.read_char();
+
+                if self.ch == b'=' {
                     self.read_char();
 
                     return Ok(GreaterThanEqual);
                 }
 
-                GreaterThan
+                return Ok(GreaterThan);
             }
 
             b'<' => {
-                if self.peek() == b'=' {
+                self.read_char();
+
+                if self.ch == b'=' {
                     self.read_char();
 
                     return Ok(LessThanEqual);
                 }
 
-                LessThan
+                return Ok(LessThan);
             }
 
             b'+' => Plus,
