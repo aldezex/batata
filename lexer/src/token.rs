@@ -1,13 +1,13 @@
 use std::fmt::{Display, Formatter, Result};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash)]
 pub enum Token {
     Illegal,
     Eof,
 
     Ident(String),
     Int(isize),
-    Float(f32),
+    // Float(f32),
     Str(String),
 
     Assign,
@@ -56,7 +56,7 @@ impl Display for Token {
 
             Ident(s) => write!(f, "ident({})", s),
             Int(i) => write!(f, "int({})", i),
-            Float(fl) => write!(f, "float({})", fl),
+            // Float(fl) => write!(f, "float({})", fl),
             Str(s) => write!(f, "str({})", s),
 
             Assign => write!(f, "assign"),
@@ -105,7 +105,7 @@ impl Token {
         match self {
             Ident(s) => s.clone(),
             Int(i) => i.to_string(),
-            Float(fl) => fl.to_string(),
+            // Float(fl) => fl.to_string(),
             Return => "return".to_string(),
             Str(s) => s.clone(),
             _ => String::new(),

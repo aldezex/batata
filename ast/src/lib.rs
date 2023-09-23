@@ -16,9 +16,11 @@ impl std::fmt::Display for Program {
     }
 }
 
+#[derive(Debug)]
 pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
+    ExpressionStatement(Expression),
 }
 
 impl std::fmt::Display for Statement {
@@ -26,13 +28,15 @@ impl std::fmt::Display for Statement {
         match self {
             Statement::LetStatement(statement) => write!(f, "{}", statement),
             Statement::ReturnStatement(statement) => write!(f, "{}", statement),
+            Statement::ExpressionStatement(statement) => write!(f, "{}", statement),
         }
     }
 }
 
+#[derive(Debug)]
 pub struct LetStatement {
     pub identifier: String,
-    // pub expression: Expression,
+    pub expression: Option<Expression>,
 }
 
 impl std::fmt::Display for LetStatement {
@@ -41,6 +45,7 @@ impl std::fmt::Display for LetStatement {
     }
 }
 
+#[derive(Debug)]
 pub struct ReturnStatement {
     pub token: Token,
 }
@@ -63,18 +68,15 @@ impl std::fmt::Display for Identifier {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Debug, PartialEq)]
+pub enum Expression {
+    IntegerLiteral(i64),
+}
 
-    #[test]
-    fn test_string() {
-        let program = Program {
-            statements: vec![Statement::LetStatement(LetStatement {
-                identifier: String::from("ident"),
-            })],
-        };
-
-        assert_eq!(program.to_string(), "let ident");
+impl std::fmt::Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Expression::IntegerLiteral(expression) => write!(f, "{}", expression),
+        }
     }
 }

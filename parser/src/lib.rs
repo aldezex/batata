@@ -2,13 +2,29 @@ use std::mem;
 
 use anyhow::{Ok, Result};
 
-use ast::{Identifier, LetStatement, Program, ReturnStatement, Statement};
+use ast::{Expression, Identifier, LetStatement, Program, ReturnStatement, Statement};
 use lexer::{token::Token, Lexer};
+
+// type PrefixParseFn = fn() -> Result<Expression>;
+// type InfixParseFn = fn(Expression) -> Result<Expression>;
 
 struct Parser {
     lexer: Lexer,
     current_token: Token,
     next_token: Token,
+    // prefix_parse_fns: HashMap<Token, PrefixParseFn>,
+    // infix_parse_fns: HashMap<Token, InfixParseFn>,
+}
+
+#[derive(PartialEq, PartialOrd)]
+enum Precedence {
+    Lowest,
+    Equals,
+    LessGreater,
+    Sum,
+    Product,
+    Prefix,
+    Call,
 }
 
 impl Parser {
@@ -20,6 +36,9 @@ impl Parser {
             lexer,
             current_token,
             next_token,
+            // TODO: explorar esta idea
+            // prefix_parse_fns: HashMap::new(),
+            // infix_parse_fns: HashMap::new(),
         })
     }
 
@@ -41,8 +60,7 @@ impl Parser {
         match self.current_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
-            // _ => self.parse_expression_statement(),
-            _ => unimplemented!(),
+            _ => self.parse_expression_statement(),
         }
     }
 
@@ -63,15 +81,36 @@ impl Parser {
             value: self.current_token.literal(),
         };
 
-        let statement = Ok(Statement::LetStatement(LetStatement {
-            identifier: name.value,
-        }));
+        // let mut statement = Ok(Statement::LetStatement(LetStatement {
+        //     identifier: name.value,
+        //     expression: None,
+        // }));
 
-        while !self.current_token_is(Token::Semicolon) {
-            self.step()?;
+        // while !self.current_token_is(Token::Assign) && !self.current_token_is(Token::Semicolon) {
+        //     self.step()?;
+        // }
+
+        self.step()?;
+
+        match self.current_token {
+            Token::Assign => {
+                self.step()?;
+                let exp = self.parse_expression_statement()?;
+
+                Ok(Statement::LetStatement(LetStatement {
+                    identifier: name.value,
+                    expression: match exp {
+                        Statement::ExpressionStatement(expression) => Some(expression),
+                        _ => None,
+                    },
+                }))
+            }
+            Token::Semicolon => Ok(Statement::LetStatement(LetStatement {
+                identifier: name.value,
+                expression: None,
+            })),
+            _ => Err(anyhow::anyhow!("failed to parse let statement")),
         }
-
-        statement
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement> {
@@ -86,7 +125,29 @@ impl Parser {
         return_statement
     }
 
-    // fn parse_expression_statement(&mut self) -> Result<Statement> {}
+    fn parse_expression_statement(&mut self) -> Result<Statement> {
+        let expression = self.parse_expression(Precedence::Lowest)?;
+
+        if self.peek_token_is(Token::Semicolon) {
+            self.step()?;
+        }
+
+        Ok(Statement::ExpressionStatement(expression))
+    }
+
+    fn parse_expression(&self, precedence: Precedence) -> Result<Expression> {
+        // self.prefix_parse_fns[&self.current_token]()
+
+        match self.current_token {
+            Token::Int(_) => self.parse_integer_literal(),
+            _ => Err(anyhow::anyhow!("failed to parse expression")),
+        }
+    }
+
+    fn parse_integer_literal(&self) -> Result<Expression> {
+        let exp = Expression::IntegerLiteral(self.current_token.literal().parse()?);
+        Ok(exp)
+    }
 
     fn step(&mut self) -> Result<()> {
         self.current_token = self.lexer.next_token()?;
@@ -99,18 +160,7 @@ impl Parser {
         self.current_token == token
     }
 
-    // fn expect_peek(&mut self, token: Token) -> Result<bool> {
-    //     if self.peek_token_is(token) {
-    //         self.step()?;
-    //         Ok(true)
-    //     } else {
-    //         Ok(false)
-    //     }
-    // }
-
     fn peek_token_is(&self, token: Token) -> bool {
-        println!("peek_token_is: {:?} == {:?}", self.next_token, token);
-
         self.next_token == token
     }
 }
@@ -184,6 +234,66 @@ mod tests {
                     assert_eq!(return_statement.token, returns[index].token);
                 }
                 _ => panic!("expected return statement"),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_integer_literals() -> Result<()> {
+        let input = r#"
+            5;
+        "#;
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+        assert_eq!(program.statements.len(), 1);
+
+        let integer = Expression::IntegerLiteral(5);
+
+        for statement in program.statements.iter() {
+            match statement {
+                Statement::ExpressionStatement(expression) => {
+                    assert_eq!(expression, &integer);
+                }
+                _ => panic!("expected expression statement"),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_simple_let_integers() -> Result<()> {
+        let input = r#"
+            let uwu;
+            let x = 5;
+            let y = 10;
+            let foobar = 838383;
+        "#;
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+
+        assert_eq!(program.statements.len(), 4);
+
+        let names = ["uwu", "x", "y", "foobar"];
+        let values = [None, Some(5), Some(10), Some(838383)];
+
+        for (index, statement) in program.statements.iter().enumerate() {
+            match statement {
+                Statement::LetStatement(let_statement) => {
+                    assert_eq!(let_statement.identifier, names[index]);
+                    assert_eq!(
+                        let_statement.expression,
+                        values[index].map(Expression::IntegerLiteral)
+                    );
+                }
+                _ => panic!("expected let statement"),
             }
         }
 
