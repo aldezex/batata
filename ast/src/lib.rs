@@ -76,6 +76,7 @@ pub enum Expression {
     Prefix(Prefix),
     Infix(Infix),
     Empty,
+    Boolean(bool),
 }
 
 impl std::fmt::Display for Expression {
@@ -87,6 +88,7 @@ impl std::fmt::Display for Expression {
             Expression::Prefix(expression) => write!(f, "{}", expression),
             Expression::Infix(expression) => write!(f, "{}", expression),
             Expression::Empty => write!(f, ""),
+            Expression::Boolean(expression) => write!(f, "{}", expression),
         }
     }
 }

@@ -197,6 +197,11 @@ impl Parser {
         Ok(exp)
     }
 
+    fn parse_boolean(&mut self) -> Result<Expression> {
+        let exp = Expression::Boolean(self.current_token_is(Token::True));
+        Ok(exp)
+    }
+
     fn parse_prefix_expression(&mut self) -> Result<Expression> {
         let lit = self.current_token.literal();
         let curr = self.current_token.clone();
@@ -262,18 +267,11 @@ impl Parser {
 
     fn get_prefix_fn(&self, token: Token) -> Option<fn(&mut Self) -> Result<Expression>> {
         match token {
-            Token::Int(_) => {
-                return Some(Self::parse_integer_literal);
-            }
-            Token::Bang | Token::Minus => {
-                return Some(Self::parse_prefix_expression);
-            }
-            Token::Ident(_) => {
-                return Some(Self::parse_identifier);
-            }
-            Token::Str(_) => {
-                return Some(Self::parse_string_literal);
-            }
+            Token::Int(_) => Some(Self::parse_integer_literal),
+            Token::Bang | Token::Minus => Some(Self::parse_prefix_expression),
+            Token::Ident(_) => Some(Self::parse_identifier),
+            Token::Str(_) => Some(Self::parse_string_literal),
+            Token::True | Token::False => Some(Self::parse_boolean),
             _ => None,
         }
     }
@@ -594,6 +592,34 @@ mod tests {
 
             let program = parser.parse_program()?;
             assert_eq!(program.to_string(), test.1);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_booleans() -> Result<()> {
+        let input = r#"
+            true;
+            false;
+        "#;
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+
+        assert_eq!(program.statements.len(), 2);
+
+        let booleans = [Expression::Boolean(true), Expression::Boolean(false)];
+
+        for (index, statement) in program.statements.iter().enumerate() {
+            match statement {
+                Statement::ExpressionStatement(expression) => {
+                    assert_eq!(expression, &booleans[index]);
+                }
+                _ => panic!("expected expression statement"),
+            }
         }
 
         Ok(())

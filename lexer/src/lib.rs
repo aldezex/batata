@@ -124,6 +124,8 @@ impl Lexer {
                     "return" => Return,
                     "async" => Async,
                     "await" => Await,
+                    "true" => True,
+                    "false" => False,
                     _ => return Ok(Ident(identifier)),
                 });
             }
