@@ -45,6 +45,9 @@ pub enum Token {
 
     DoubleQuote,
     SingleQuote,
+
+    True,
+    False,
 }
 
 impl Display for Token {
@@ -96,6 +99,9 @@ impl Display for Token {
 
             DoubleQuote => write!(f, "doubleQuote"),
             SingleQuote => write!(f, "singleQuote"),
+
+            True => write!(f, "true"),
+            False => write!(f, "false"),
         }
     }
 }

@@ -3,9 +3,13 @@ use std::{collections::HashMap, mem};
 use anyhow::{Ok, Result};
 
 use ast::{
-    Expression, Identifier, Infix, LetStatement, Prefix, Program, ReturnStatement, Statement,
+    BlockStatement, Expression, Identifier, IfExpression, Infix, LetStatement, Prefix, Program,
+    ReturnStatement, Statement,
 };
-use lexer::{token::Token, Lexer};
+use lexer::{
+    token::{self, Token},
+    Lexer,
+};
 
 struct Parser {
     lexer: Lexer,
@@ -121,15 +125,24 @@ impl Parser {
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement> {
-        let return_statement = Ok(Statement::ReturnStatement(ReturnStatement {
-            token: self.next_token.clone(),
-        }));
-
-        while !self.current_token_is(Token::Semicolon) {
+        if self.peek_token_is(Token::Semicolon) {
             self.step()?;
+
+            return Ok(Statement::ReturnStatement(ReturnStatement {
+                expression: Expression::Empty,
+            }));
         }
 
-        return_statement
+        self.step()?;
+
+        let exp = self.parse_expression_statement()?;
+
+        Ok(Statement::ReturnStatement(ReturnStatement {
+            expression: match exp {
+                Statement::ExpressionStatement(expression) => expression,
+                _ => Expression::Empty,
+            },
+        }))
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement> {
@@ -174,6 +187,11 @@ impl Parser {
         Ok(exp)
     }
 
+    fn parse_string_literal(&mut self) -> Result<Expression> {
+        let exp = Expression::StringLiteral(self.current_token.literal());
+        Ok(exp)
+    }
+
     fn parse_identifier(&mut self) -> Result<Expression> {
         let exp = Expression::Identifier(Identifier {
             token: self.current_token.to_string(),
@@ -181,6 +199,95 @@ impl Parser {
         });
 
         Ok(exp)
+    }
+
+    fn parse_boolean(&mut self) -> Result<Expression> {
+        let exp = Expression::Boolean(self.current_token_is(Token::True));
+        Ok(exp)
+    }
+
+    fn parse_grouped_expression(&mut self) -> Result<Expression> {
+        self.step()?;
+
+        let exp = self.parse_expression(Precedence::Lowest)?;
+
+        if !self.peek_token_is(Token::Rparen) {
+            return Err(anyhow::anyhow!("failed to parse grouped expression"));
+        }
+
+        self.step()?;
+
+        Ok(exp)
+    }
+
+    fn parse_if_expression(&mut self) -> Result<Expression> {
+        let current_token = self.current_token.clone();
+
+        if !self.peek_token_is(token::Token::Lparen) {
+            return Err(anyhow::anyhow!("failed to parse if expression"));
+        }
+
+        self.step()?;
+
+        let exp = self.parse_expression(Precedence::Lowest)?;
+
+        if !self.current_token_is(Token::Rparen) {
+            return Err(anyhow::anyhow!(
+                "failed to parse if expression -> there is no right parenthesis"
+            ));
+        }
+
+        if !self.peek_token_is(Token::Lbrace) {
+            return Err(anyhow::anyhow!(
+                "failed to parse if expression -> there is no left brace"
+            ));
+        }
+
+        self.step()?;
+
+        let consequence = self.parse_block_statement()?;
+
+        let alternative = if self.peek_token_is(Token::Else) {
+            self.step()?;
+
+            if !self.peek_token_is(Token::Lbrace) {
+                return Err(anyhow::anyhow!(
+                    "failed to parse if expression -> there is no left brace"
+                ));
+            }
+
+            self.step()?;
+
+            Some(self.parse_block_statement()?)
+        } else {
+            None
+        };
+
+        Ok(Expression::IfExpression(IfExpression {
+            token: current_token,
+            condition: Box::new(exp),
+            consequence,
+            alternative,
+        }))
+    }
+
+    fn parse_block_statement(&mut self) -> Result<BlockStatement> {
+        let current_token = self.current_token.clone();
+        let mut statements = Vec::new();
+
+        self.step()?;
+
+        while !self.current_token_is(Token::Rbrace) && !self.current_token_is(Token::Eof) {
+            let statement = self.parse_statement()?;
+
+            statements.push(statement);
+            self.step()?;
+        }
+
+        Ok(BlockStatement {
+            token: current_token,
+            statements,
+        })
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Expression> {
@@ -248,15 +355,13 @@ impl Parser {
 
     fn get_prefix_fn(&self, token: Token) -> Option<fn(&mut Self) -> Result<Expression>> {
         match token {
-            Token::Int(_) => {
-                return Some(Self::parse_integer_literal);
-            }
-            Token::Bang | Token::Minus => {
-                return Some(Self::parse_prefix_expression);
-            }
-            Token::Ident(_) => {
-                return Some(Self::parse_identifier);
-            }
+            Token::Int(_) => Some(Self::parse_integer_literal),
+            Token::Bang | Token::Minus => Some(Self::parse_prefix_expression),
+            Token::Ident(_) => Some(Self::parse_identifier),
+            Token::Str(_) => Some(Self::parse_string_literal),
+            Token::True | Token::False => Some(Self::parse_boolean),
+            Token::Lparen => Some(Self::parse_grouped_expression),
+            Token::If => Some(Self::parse_if_expression),
             _ => None,
         }
     }
@@ -326,26 +431,31 @@ mod tests {
 
         let returns = [
             ReturnStatement {
-                token: Token::Semicolon,
+                expression: Expression::Empty,
             },
             ReturnStatement {
-                token: Token::Int(5),
+                expression: Expression::IntegerLiteral(5),
             },
             ReturnStatement {
-                token: Token::Str("hello".to_string()),
+                expression: Expression::StringLiteral("hello".to_string()),
             },
             ReturnStatement {
-                token: Token::Str("world".to_string()),
+                expression: Expression::StringLiteral("world".to_string()),
             },
             ReturnStatement {
-                token: Token::Int(5),
+                expression: Expression::Infix(Infix {
+                    token: Token::Plus,
+                    left: Box::new(Expression::IntegerLiteral(5)),
+                    operator: "+".to_string(),
+                    right: Box::new(Expression::IntegerLiteral(5)),
+                }),
             },
         ];
 
         for (index, statement) in program.statements.iter().enumerate() {
             match statement {
                 Statement::ReturnStatement(return_statement) => {
-                    assert_eq!(return_statement.token, returns[index].token);
+                    assert_eq!(return_statement, &returns[index]);
                 }
                 _ => panic!("expected return statement"),
             }
@@ -558,12 +668,11 @@ mod tests {
             ("false", "false"),
             ("3 > 5 == false", "((3 > 5) == false)"),
             ("3 < 5 == true", "((3 < 5) == true)"),
-            // ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
-            // ("(5 + 5) * 2", "((5 + 5) * 2)"),
-            // ("2 / (5 + 5)", "(2 / (5 + 5))"),
-            // ("-(5 + 5)", "(-(5 + 5))"),
-            // ("!(true == true)", "(!(true == true))"),
-            // ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         for test in tests.iter() {
@@ -572,6 +681,216 @@ mod tests {
 
             let program = parser.parse_program()?;
             assert_eq!(program.to_string(), test.1);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_booleans() -> Result<()> {
+        let input = r#"
+            true;
+            false;
+        "#;
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+
+        assert_eq!(program.statements.len(), 2);
+
+        let booleans = [Expression::Boolean(true), Expression::Boolean(false)];
+
+        for (index, statement) in program.statements.iter().enumerate() {
+            match statement {
+                Statement::ExpressionStatement(expression) => {
+                    assert_eq!(expression, &booleans[index]);
+                }
+                _ => panic!("expected expression statement"),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_if_else() -> Result<()> {
+        let input = r#"
+            if (x < y) { x; }
+            else { y }
+        "#;
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+
+        assert_eq!(program.statements.len(), 1);
+
+        let if_expression = Expression::IfExpression(IfExpression {
+            token: Token::If,
+            condition: Box::new(Expression::Infix(Infix {
+                token: Token::LessThan,
+                left: Box::new(Expression::Identifier(Identifier {
+                    token: "ident(x)".to_string(),
+                    value: "x".to_string(),
+                })),
+                operator: "<".to_string(),
+                right: Box::new(Expression::Identifier(Identifier {
+                    token: "ident(y)".to_string(),
+                    value: "y".to_string(),
+                })),
+            })),
+            consequence: BlockStatement {
+                token: Token::Lbrace,
+                statements: vec![Statement::ExpressionStatement(Expression::Identifier(
+                    Identifier {
+                        token: "ident(x)".to_string(),
+                        value: "x".to_string(),
+                    },
+                ))],
+            },
+            alternative: Some(BlockStatement {
+                token: Token::Lbrace,
+                statements: vec![Statement::ExpressionStatement(Expression::Identifier(
+                    Identifier {
+                        token: "ident(y)".to_string(),
+                        value: "y".to_string(),
+                    },
+                ))],
+            }),
+        });
+
+        for statement in program.statements.iter() {
+            match statement {
+                Statement::ExpressionStatement(expression) => {
+                    assert_eq!(expression, &if_expression);
+                }
+                _ => panic!("expected expression statement"),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_another_if() -> Result<()> {
+        let input = r#"
+            if (x < y) { x; }
+        "#;
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+
+        assert_eq!(program.statements.len(), 1);
+
+        let if_expression = Expression::IfExpression(IfExpression {
+            token: Token::If,
+            condition: Box::new(Expression::Infix(Infix {
+                token: Token::LessThan,
+                left: Box::new(Expression::Identifier(Identifier {
+                    token: "ident(x)".to_string(),
+                    value: "x".to_string(),
+                })),
+                operator: "<".to_string(),
+                right: Box::new(Expression::Identifier(Identifier {
+                    token: "ident(y)".to_string(),
+                    value: "y".to_string(),
+                })),
+            })),
+            consequence: BlockStatement {
+                token: Token::Lbrace,
+                statements: vec![Statement::ExpressionStatement(Expression::Identifier(
+                    Identifier {
+                        token: "ident(x)".to_string(),
+                        value: "x".to_string(),
+                    },
+                ))],
+            },
+            alternative: None,
+        });
+
+        for statement in program.statements.iter() {
+            match statement {
+                Statement::ExpressionStatement(expression) => {
+                    assert_eq!(expression, &if_expression);
+                }
+                _ => panic!("expected expression statement"),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_last_if_complex() -> Result<()> {
+        let input = r#"
+            if (x < y) { x + y; }
+            else { z + w; }
+        "#;
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+        assert_eq!(program.statements.len(), 1);
+
+        let if_expression = Expression::IfExpression(IfExpression {
+            token: Token::If,
+            condition: Box::new(Expression::Infix(Infix {
+                token: Token::LessThan,
+                left: Box::new(Expression::Identifier(Identifier {
+                    token: "ident(x)".to_string(),
+                    value: "x".to_string(),
+                })),
+                operator: "<".to_string(),
+                right: Box::new(Expression::Identifier(Identifier {
+                    token: "ident(y)".to_string(),
+                    value: "y".to_string(),
+                })),
+            })),
+            consequence: BlockStatement {
+                token: Token::Lbrace,
+                statements: vec![Statement::ExpressionStatement(Expression::Infix(Infix {
+                    token: Token::Plus,
+                    left: Box::new(Expression::Identifier(Identifier {
+                        token: "ident(x)".to_string(),
+                        value: "x".to_string(),
+                    })),
+                    operator: "+".to_string(),
+                    right: Box::new(Expression::Identifier(Identifier {
+                        token: "ident(y)".to_string(),
+                        value: "y".to_string(),
+                    })),
+                }))],
+            },
+            alternative: Some(BlockStatement {
+                token: Token::Lbrace,
+                statements: vec![Statement::ExpressionStatement(Expression::Infix(Infix {
+                    token: Token::Plus,
+                    left: Box::new(Expression::Identifier(Identifier {
+                        token: "ident(z)".to_string(),
+                        value: "z".to_string(),
+                    })),
+                    operator: "+".to_string(),
+                    right: Box::new(Expression::Identifier(Identifier {
+                        token: "ident(w)".to_string(),
+                        value: "w".to_string(),
+                    })),
+                }))],
+            }),
+        });
+
+        for statement in program.statements.iter() {
+            match statement {
+                Statement::ExpressionStatement(expression) => {
+                    assert_eq!(expression, &if_expression);
+                }
+                _ => panic!("expected expression statement"),
+            }
         }
 
         Ok(())
