@@ -202,6 +202,20 @@ impl Parser {
         Ok(exp)
     }
 
+    fn parse_grouped_expression(&mut self) -> Result<Expression> {
+        self.step()?;
+
+        let exp = self.parse_expression(Precedence::Lowest)?;
+
+        if !self.peek_token_is(Token::Rparen) {
+            return Err(anyhow::anyhow!("failed to parse grouped expression"));
+        }
+
+        self.step()?;
+
+        Ok(exp)
+    }
+
     fn parse_prefix_expression(&mut self) -> Result<Expression> {
         let lit = self.current_token.literal();
         let curr = self.current_token.clone();
@@ -272,6 +286,7 @@ impl Parser {
             Token::Ident(_) => Some(Self::parse_identifier),
             Token::Str(_) => Some(Self::parse_string_literal),
             Token::True | Token::False => Some(Self::parse_boolean),
+            Token::Lparen => Some(Self::parse_grouped_expression),
             _ => None,
         }
     }
@@ -578,12 +593,11 @@ mod tests {
             ("false", "false"),
             ("3 > 5 == false", "((3 > 5) == false)"),
             ("3 < 5 == true", "((3 < 5) == true)"),
-            // ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
-            // ("(5 + 5) * 2", "((5 + 5) * 2)"),
-            // ("2 / (5 + 5)", "(2 / (5 + 5))"),
-            // ("-(5 + 5)", "(-(5 + 5))"),
-            // ("!(true == true)", "(!(true == true))"),
-            // ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         for test in tests.iter() {
