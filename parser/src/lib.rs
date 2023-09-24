@@ -121,15 +121,24 @@ impl Parser {
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement> {
-        let return_statement = Ok(Statement::ReturnStatement(ReturnStatement {
-            token: self.next_token.clone(),
-        }));
-
-        while !self.current_token_is(Token::Semicolon) {
+        if self.peek_token_is(Token::Semicolon) {
             self.step()?;
+
+            return Ok(Statement::ReturnStatement(ReturnStatement {
+                expression: Expression::Empty,
+            }));
         }
 
-        return_statement
+        self.step()?;
+
+        let exp = self.parse_expression_statement()?;
+
+        Ok(Statement::ReturnStatement(ReturnStatement {
+            expression: match exp {
+                Statement::ExpressionStatement(expression) => expression,
+                _ => Expression::Empty,
+            },
+        }))
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement> {
@@ -171,6 +180,11 @@ impl Parser {
 
     fn parse_integer_literal(&mut self) -> Result<Expression> {
         let exp = Expression::IntegerLiteral(self.current_token.literal().parse()?);
+        Ok(exp)
+    }
+
+    fn parse_string_literal(&mut self) -> Result<Expression> {
+        let exp = Expression::StringLiteral(self.current_token.literal());
         Ok(exp)
     }
 
@@ -257,6 +271,9 @@ impl Parser {
             Token::Ident(_) => {
                 return Some(Self::parse_identifier);
             }
+            Token::Str(_) => {
+                return Some(Self::parse_string_literal);
+            }
             _ => None,
         }
     }
@@ -326,26 +343,31 @@ mod tests {
 
         let returns = [
             ReturnStatement {
-                token: Token::Semicolon,
+                expression: Expression::Empty,
             },
             ReturnStatement {
-                token: Token::Int(5),
+                expression: Expression::IntegerLiteral(5),
             },
             ReturnStatement {
-                token: Token::Str("hello".to_string()),
+                expression: Expression::StringLiteral("hello".to_string()),
             },
             ReturnStatement {
-                token: Token::Str("world".to_string()),
+                expression: Expression::StringLiteral("world".to_string()),
             },
             ReturnStatement {
-                token: Token::Int(5),
+                expression: Expression::Infix(Infix {
+                    token: Token::Plus,
+                    left: Box::new(Expression::IntegerLiteral(5)),
+                    operator: "+".to_string(),
+                    right: Box::new(Expression::IntegerLiteral(5)),
+                }),
             },
         ];
 
         for (index, statement) in program.statements.iter().enumerate() {
             match statement {
                 Statement::ReturnStatement(return_statement) => {
-                    assert_eq!(return_statement.token, returns[index].token);
+                    assert_eq!(return_statement, &returns[index]);
                 }
                 _ => panic!("expected return statement"),
             }

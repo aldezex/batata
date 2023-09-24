@@ -16,7 +16,7 @@ impl std::fmt::Display for Program {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
@@ -33,7 +33,7 @@ impl std::fmt::Display for Statement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct LetStatement {
     pub identifier: String,
     pub expression: Option<Expression>,
@@ -45,14 +45,14 @@ impl std::fmt::Display for LetStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ReturnStatement {
-    pub token: Token,
+    pub expression: Expression,
 }
 
 impl std::fmt::Display for ReturnStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{};", self.token)
+        write!(f, "{};", self.expression)
     }
 }
 
@@ -71,6 +71,7 @@ impl std::fmt::Display for Identifier {
 #[derive(Debug, PartialEq)]
 pub enum Expression {
     Identifier(Identifier),
+    StringLiteral(String),
     IntegerLiteral(i64),
     Prefix(Prefix),
     Infix(Infix),
@@ -82,6 +83,7 @@ impl std::fmt::Display for Expression {
         match self {
             Expression::Identifier(expression) => write!(f, "{}", expression),
             Expression::IntegerLiteral(expression) => write!(f, "{}", expression),
+            Expression::StringLiteral(expression) => write!(f, "{}", expression),
             Expression::Prefix(expression) => write!(f, "{}", expression),
             Expression::Infix(expression) => write!(f, "{}", expression),
             Expression::Empty => write!(f, ""),
