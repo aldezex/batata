@@ -3,8 +3,8 @@ use std::{collections::HashMap, mem};
 use anyhow::{Ok, Result};
 
 use ast::{
-    BlockStatement, Expression, Identifier, IfExpression, Infix, LetStatement, Prefix, Program,
-    ReturnStatement, Statement,
+    BlockStatement, Expression, FunctionLiteral, Identifier, IfExpression, Infix, LetStatement,
+    Prefix, Program, ReturnStatement, Statement,
 };
 use lexer::{
     token::{self, Token},
@@ -322,6 +322,72 @@ impl Parser {
         Ok(exp)
     }
 
+    fn parse_function_literal(&mut self) -> Result<Expression> {
+        let curr = self.current_token.clone();
+
+        if !self.peek_token_is(Token::Lparen) {
+            return Err(anyhow::anyhow!("failed to parse function literal"));
+        }
+
+        self.step()?;
+
+        let parameters = self.parse_function_parameters()?;
+
+        if !self.peek_token_is(Token::Lbrace) {
+            return Err(anyhow::anyhow!("failed to parse function literal"));
+        }
+
+        self.step()?;
+
+        let body = self.parse_block_statement()?;
+
+        Ok(Expression::FunctionLiteral(FunctionLiteral {
+            token: curr,
+            parameters,
+            body,
+        }))
+    }
+
+    fn parse_function_parameters(&mut self) -> Result<Vec<Identifier>> {
+        let mut identifiers = Vec::new();
+
+        if self.peek_token_is(Token::Rparen) {
+            self.step()?;
+            self.step()?;
+
+            return Ok(identifiers);
+        }
+
+        self.step()?;
+
+        let identifier = Identifier {
+            token: self.current_token.to_string(),
+            value: self.current_token.literal(),
+        };
+
+        identifiers.push(identifier);
+
+        while self.peek_token_is(Token::Comma) {
+            self.step()?;
+            self.step()?;
+
+            let identifier = Identifier {
+                token: self.current_token.to_string(),
+                value: self.current_token.literal(),
+            };
+
+            identifiers.push(identifier);
+        }
+
+        if !self.peek_token_is(Token::Rparen) {
+            return Err(anyhow::anyhow!("failed to parse function parameters"));
+        }
+
+        self.step()?;
+
+        Ok(identifiers)
+    }
+
     fn step(&mut self) -> Result<()> {
         self.current_token = self.lexer.next_token()?;
         mem::swap(&mut self.current_token, &mut self.next_token);
@@ -362,6 +428,7 @@ impl Parser {
             Token::True | Token::False => Some(Self::parse_boolean),
             Token::Lparen => Some(Self::parse_grouped_expression),
             Token::If => Some(Self::parse_if_expression),
+            Token::Function => Some(Self::parse_function_literal),
             _ => None,
         }
     }
@@ -888,6 +955,63 @@ mod tests {
             match statement {
                 Statement::ExpressionStatement(expression) => {
                     assert_eq!(expression, &if_expression);
+                }
+                _ => panic!("expected expression statement"),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_function_literal() -> Result<()> {
+        let input = r#"
+            function(x, y, z) { x + y; }
+        "#;
+
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer)?;
+
+        let program = parser.parse_program()?;
+        assert_eq!(program.statements.len(), 1);
+
+        let function_literal = Expression::FunctionLiteral(FunctionLiteral {
+            token: Token::Function,
+            parameters: vec![
+                Identifier {
+                    token: "ident(x)".to_string(),
+                    value: "x".to_string(),
+                },
+                Identifier {
+                    token: "ident(y)".to_string(),
+                    value: "y".to_string(),
+                },
+                Identifier {
+                    token: "ident(z)".to_string(),
+                    value: "z".to_string(),
+                },
+            ],
+            body: BlockStatement {
+                token: Token::Lbrace,
+                statements: vec![Statement::ExpressionStatement(Expression::Infix(Infix {
+                    token: Token::Plus,
+                    left: Box::new(Expression::Identifier(Identifier {
+                        token: "ident(x)".to_string(),
+                        value: "x".to_string(),
+                    })),
+                    operator: "+".to_string(),
+                    right: Box::new(Expression::Identifier(Identifier {
+                        token: "ident(y)".to_string(),
+                        value: "y".to_string(),
+                    })),
+                }))],
+            },
+        });
+
+        for statement in program.statements.iter() {
+            match statement {
+                Statement::ExpressionStatement(expression) => {
+                    assert_eq!(expression, &function_literal);
                 }
                 _ => panic!("expected expression statement"),
             }
