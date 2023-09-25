@@ -98,6 +98,8 @@ pub enum Expression {
     Empty,
     Boolean(bool),
     IfExpression(IfExpression),
+    FunctionLiteral(FunctionLiteral),
+    CallExpression(CallExpression),
 }
 
 #[derive(Debug, PartialEq)]
@@ -106,6 +108,20 @@ pub struct IfExpression {
     pub condition: Box<Expression>,
     pub consequence: BlockStatement,
     pub alternative: Option<BlockStatement>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FunctionLiteral {
+    pub token: Token,
+    pub parameters: Vec<Identifier>,
+    pub body: BlockStatement,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CallExpression {
+    pub token: Token,
+    pub function: Box<Expression>,
+    pub arguments: Vec<Expression>,
 }
 
 impl std::fmt::Display for Expression {
@@ -119,6 +135,8 @@ impl std::fmt::Display for Expression {
             Expression::Empty => write!(f, ""),
             Expression::Boolean(expression) => write!(f, "{}", expression),
             Expression::IfExpression(expression) => write!(f, "{}", expression),
+            Expression::FunctionLiteral(expression) => write!(f, "{}", expression),
+            Expression::CallExpression(expression) => write!(f, "{}", expression),
         }
     }
 }
@@ -129,7 +147,7 @@ impl std::fmt::Display for IfExpression {
 
         if_expression.push_str("if");
         if_expression.push_str(&self.condition.to_string());
-        if_expression.push_str(" ");
+        if_expression.push(' ');
         if_expression.push_str(&self.consequence.to_string());
 
         if let Some(alternative) = &self.alternative {
@@ -138,6 +156,47 @@ impl std::fmt::Display for IfExpression {
         }
 
         write!(f, "{}", if_expression)
+    }
+}
+
+impl std::fmt::Display for FunctionLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut function_literal = String::new();
+
+        function_literal.push_str(&self.token.to_string());
+        function_literal.push('(');
+
+        let mut parameters = Vec::new();
+
+        for parameter in &self.parameters {
+            parameters.push(parameter.to_string());
+        }
+
+        function_literal.push_str(&parameters.join(", "));
+        function_literal.push_str(") ");
+        function_literal.push_str(&self.body.to_string());
+
+        write!(f, "{}", function_literal)
+    }
+}
+
+impl std::fmt::Display for CallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut call_expression = String::new();
+
+        call_expression.push_str(&self.function.to_string());
+        call_expression.push('(');
+
+        let mut arguments = Vec::new();
+
+        for argument in &self.arguments {
+            arguments.push(argument.to_string());
+        }
+
+        call_expression.push_str(&arguments.join(", "));
+        call_expression.push(')');
+
+        write!(f, "{}", call_expression)
     }
 }
 
