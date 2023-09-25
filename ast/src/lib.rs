@@ -99,6 +99,7 @@ pub enum Expression {
     Boolean(bool),
     IfExpression(IfExpression),
     FunctionLiteral(FunctionLiteral),
+    CallExpression(CallExpression),
 }
 
 #[derive(Debug, PartialEq)]
@@ -116,6 +117,13 @@ pub struct FunctionLiteral {
     pub body: BlockStatement,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct CallExpression {
+    pub token: Token,
+    pub function: Box<Expression>,
+    pub arguments: Vec<Expression>,
+}
+
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -128,6 +136,7 @@ impl std::fmt::Display for Expression {
             Expression::Boolean(expression) => write!(f, "{}", expression),
             Expression::IfExpression(expression) => write!(f, "{}", expression),
             Expression::FunctionLiteral(expression) => write!(f, "{}", expression),
+            Expression::CallExpression(expression) => write!(f, "{}", expression),
         }
     }
 }
@@ -168,6 +177,26 @@ impl std::fmt::Display for FunctionLiteral {
         function_literal.push_str(&self.body.to_string());
 
         write!(f, "{}", function_literal)
+    }
+}
+
+impl std::fmt::Display for CallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut call_expression = String::new();
+
+        call_expression.push_str(&self.function.to_string());
+        call_expression.push('(');
+
+        let mut arguments = Vec::new();
+
+        for argument in &self.arguments {
+            arguments.push(argument.to_string());
+        }
+
+        call_expression.push_str(&arguments.join(", "));
+        call_expression.push(')');
+
+        write!(f, "{}", call_expression)
     }
 }
 
