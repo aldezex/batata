@@ -6,7 +6,7 @@ pub enum Object {
 }
 
 impl Object {
-    fn inspect(&self) -> String {
+    pub fn inspect(&self) -> String {
         match self {
             Object::Integer(i) => i.to_string(),
             Object::Boolean(b) => b.to_string(),
@@ -14,7 +14,7 @@ impl Object {
         }
     }
 
-    fn type_name(&self) -> String {
+    pub fn type_name(&self) -> String {
         match self {
             Object::Integer(_) => "INTEGER".to_string(),
             Object::Boolean(_) => "BOOLEAN".to_string(),

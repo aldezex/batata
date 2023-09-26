@@ -3,7 +3,7 @@ use object::Object;
 
 pub mod object;
 
-fn eval(node: Node) -> object::Object {
+fn eval(node: Node) -> Object {
     match node {
         Node::Program(program) => evalStatements(program.statements),
         Node::Statement(statement) => match statement {
@@ -27,7 +27,12 @@ fn eval(node: Node) -> object::Object {
                     _ => Object::Null,
                 }
             }
-            ast::Expression::Infix(_) => todo!(),
+            ast::Expression::Infix(infix) => {
+                let left = eval(ast::Node::Expression(*infix.left));
+                let right = eval(ast::Node::Expression(*infix.right));
+
+                evalInfixExpression(infix.operator, left, right)
+            }
             ast::Expression::Empty => todo!(),
             ast::Expression::Boolean(boolean) => Object::Boolean(boolean),
             ast::Expression::IfExpression(_) => todo!(),
@@ -37,8 +42,8 @@ fn eval(node: Node) -> object::Object {
     }
 }
 
-fn evalStatements(statements: Vec<ast::Statement>) -> object::Object {
-    let mut result = object::Object::Null;
+fn evalStatements(statements: Vec<ast::Statement>) -> Object {
+    let mut result = Object::Null;
 
     for statement in statements {
         result = eval(ast::Node::Statement(statement));
@@ -47,19 +52,58 @@ fn evalStatements(statements: Vec<ast::Statement>) -> object::Object {
     result
 }
 
-fn evalBangOperatorExpression(right: object::Object) -> object::Object {
+fn evalBangOperatorExpression(right: Object) -> Object {
     match right {
-        object::Object::Boolean(true) => object::Object::Boolean(false),
-        object::Object::Boolean(false) => object::Object::Boolean(true),
-        object::Object::Null => object::Object::Boolean(true),
-        _ => object::Object::Boolean(false),
+        Object::Boolean(true) => Object::Boolean(false),
+        Object::Boolean(false) => Object::Boolean(true),
+        Object::Null => Object::Boolean(true),
+        _ => Object::Boolean(false),
     }
 }
 
-fn evalMinusPrefixOperatorExpression(right: object::Object) -> object::Object {
+fn evalMinusPrefixOperatorExpression(right: Object) -> Object {
     match right {
-        object::Object::Integer(i) => object::Object::Integer(-i),
-        _ => object::Object::Null,
+        Object::Integer(i) => Object::Integer(-i),
+        _ => Object::Null,
+    }
+}
+
+fn evalInfixExpression(operator: String, left: Object, right: Object) -> Object {
+    match left.type_name() == "INTEGER" && right.type_name() == "INTEGER" {
+        true => evalIntegerInfixExpression(operator, left, right),
+        _ => {
+            if operator == "==" {
+                Object::Boolean(left == right)
+            } else if operator == "!=" {
+                Object::Boolean(left != right)
+            } else {
+                Object::Null
+            }
+        }
+    }
+}
+
+fn evalIntegerInfixExpression(operator: String, left: Object, right: Object) -> Object {
+    let leftVal = match left {
+        Object::Integer(i) => i,
+        _ => 0,
+    };
+
+    let rightVal = match right {
+        Object::Integer(i) => i,
+        _ => 0,
+    };
+
+    match operator.as_str() {
+        "+" => Object::Integer(leftVal + rightVal),
+        "-" => Object::Integer(leftVal - rightVal),
+        "*" => Object::Integer(leftVal * rightVal),
+        "/" => Object::Integer(leftVal / rightVal),
+        "<" => Object::Boolean(leftVal < rightVal),
+        ">" => Object::Boolean(leftVal > rightVal),
+        "==" => Object::Boolean(leftVal == rightVal),
+        "!=" => Object::Boolean(leftVal != rightVal),
+        _ => Object::Null,
     }
 }
 
@@ -71,7 +115,23 @@ mod tests {
 
     #[test]
     fn test_integer_expression() -> Result<()> {
-        let tests = vec![("5", 5), ("10", 10), ("-5", -5), ("-10", -10)];
+        let tests = vec![
+            ("5", 5),
+            ("10", 10),
+            ("-5", -5),
+            ("-10", -10),
+            ("5 + 5 + 5 + 5 - 10", 10),
+            ("2 * 2 * 2 * 2 * 2", 32),
+            ("-50 + 100 + -50", 0),
+            ("5 * 2 + 10", 20),
+            ("5 + 2 * 10", 25),
+            ("20 + 2 * -10", 0),
+            ("50 / 2 * 2 + 10", 60),
+            ("2 * (5 + 10)", 30),
+            ("3 * 3 * 3 + 10", 37),
+            ("3 * (3 * 3) + 10", 37),
+            ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
+        ];
 
         for (input, expected) in tests {
             let lexer = lexer::Lexer::new(input.into());
@@ -80,7 +140,7 @@ mod tests {
 
             let evaluation = eval(ast::Node::Program(program));
 
-            assert_eq!(evaluation, object::Object::Integer(expected));
+            assert_eq!(evaluation, Object::Integer(expected));
         }
 
         Ok(())
@@ -88,7 +148,19 @@ mod tests {
 
     #[test]
     fn test_boolean_literals() -> Result<()> {
-        let tests = vec![("true", true), ("false", false)];
+        let tests = vec![
+            ("true", true),
+            ("false", false),
+            ("true == true", true),
+            ("false == false", true),
+            ("true == false", false),
+            ("true != false", true),
+            ("false != true", true),
+            ("(1 < 2) == true", true),
+            ("(1 < 2) == false", false),
+            ("(1 > 2) == true", false),
+            ("(1 > 2) == false", true),
+        ];
 
         for (input, expected) in tests {
             let lexer = lexer::Lexer::new(input.into());
@@ -97,7 +169,7 @@ mod tests {
 
             let evaluation = eval(ast::Node::Program(program));
 
-            assert_eq!(evaluation, object::Object::Boolean(expected));
+            assert_eq!(evaluation, Object::Boolean(expected));
         }
 
         Ok(())
@@ -121,7 +193,7 @@ mod tests {
 
             let evaluation = eval(ast::Node::Program(program));
 
-            assert_eq!(evaluation, object::Object::Boolean(expected));
+            assert_eq!(evaluation, Object::Boolean(expected));
         }
 
         Ok(())
