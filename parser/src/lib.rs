@@ -11,7 +11,7 @@ use lexer::{
     Lexer,
 };
 
-struct Parser {
+pub struct Parser {
     lexer: Lexer,
     current_token: Token,
     next_token: Token,
@@ -30,7 +30,7 @@ enum Precedence {
 }
 
 impl Parser {
-    fn new(mut lexer: Lexer) -> Result<Self> {
+    pub fn new(mut lexer: Lexer) -> Result<Self> {
         let current_token = lexer.next_token()?;
         let next_token = lexer.next_token()?;
 
@@ -54,7 +54,7 @@ impl Parser {
         })
     }
 
-    fn parse_program(&mut self) -> Result<Program> {
+    pub fn parse_program(&mut self) -> Result<Program> {
         let mut program = Program {
             statements: Vec::new(),
         };

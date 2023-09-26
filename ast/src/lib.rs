@@ -1,5 +1,11 @@
 use lexer::token::Token;
 
+pub enum Node {
+    Program(Program),
+    Statement(Statement),
+    Expression(Expression),
+}
+
 pub struct Program {
     pub statements: Vec<Statement>,
 }

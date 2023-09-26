@@ -20,6 +20,16 @@ name = "batata"
 version = "0.1.0"
 
 [[package]]
+name = "evaluator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ast",
+ "lexer",
+ "parser",
+]
+
+[[package]]
 name = "lexer"
 version = "0.1.0"
 dependencies = [
