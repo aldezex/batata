@@ -1,54 +1,81 @@
 use ast::{BlockStatement, IfExpression, Node, Program};
+use environment::Environment;
 use object::Object;
 
+pub mod environment;
 pub mod object;
 
-fn eval(node: Node) -> Object {
+fn eval(node: Node, env: &mut Environment) -> Object {
     match node {
-        Node::Program(program) => eval_program(program),
+        Node::Program(program) => eval_program(program, env),
         Node::Statement(statement) => match statement {
-            ast::Statement::LetStatement(_) => todo!(),
+            ast::Statement::LetStatement(statement) => {
+                if statement.expression.is_none() {
+                    return Object::Error("expected expression".into());
+                }
+
+                let value = eval(ast::Node::Expression(statement.expression.unwrap()), env);
+
+                if value.type_name() == "ERROR" {
+                    return value;
+                }
+
+                env.set(&statement.identifier, value)
+            }
             ast::Statement::ReturnStatement(ret) => {
-                Object::Return(Box::new(eval(ast::Node::Expression(ret.expression))))
+                Object::Return(Box::new(eval(ast::Node::Expression(ret.expression), env)))
             }
             ast::Statement::ExpressionStatement(expression) => {
-                eval(ast::Node::Expression(expression))
+                eval(ast::Node::Expression(expression), env)
             }
-            ast::Statement::BlockStatement(block) => eval_block_statement(block),
+            ast::Statement::BlockStatement(block) => eval_block_statement(block, env),
         },
         Node::Expression(expression) => match expression {
-            ast::Expression::Identifier(_) => todo!(),
+            ast::Expression::Identifier(identifier) => eval_identifier(identifier, env),
             ast::Expression::StringLiteral(_) => todo!(),
             ast::Expression::IntegerLiteral(i) => Object::Integer(i),
             ast::Expression::Prefix(prefix) => {
-                let right = eval(ast::Node::Expression(*prefix.right));
+                let right = eval(ast::Node::Expression(*prefix.right), env);
 
                 match prefix.operator.as_str() {
                     "!" => eval_bang_operator_expression(right),
                     "-" => eval_minus_prefix_operator_expression(right),
-                    _ => Object::Null,
+                    _ => Object::Error(format!(
+                        "unknown operator: {}{}",
+                        prefix.operator,
+                        right.type_name()
+                    )),
                 }
             }
             ast::Expression::Infix(infix) => {
-                let left = eval(ast::Node::Expression(*infix.left));
-                let right = eval(ast::Node::Expression(*infix.right));
+                let left = eval(ast::Node::Expression(*infix.left), env);
+                let right = eval(ast::Node::Expression(*infix.right), env);
+
+                if left.type_name() != right.type_name() {
+                    return Object::Error(format!(
+                        "type mismatch: {} {} {}",
+                        left.type_name(),
+                        infix.operator,
+                        right.type_name()
+                    ));
+                }
 
                 eval_infix_expression(infix.operator, left, right)
             }
             ast::Expression::Empty => todo!(),
             ast::Expression::Boolean(boolean) => Object::Boolean(boolean),
-            ast::Expression::IfExpression(ifexp) => eval_if_expression(ifexp),
+            ast::Expression::IfExpression(ifexp) => eval_if_expression(ifexp, env),
             ast::Expression::FunctionLiteral(_) => todo!(),
             ast::Expression::CallExpression(_) => todo!(),
         },
     }
 }
 
-fn eval_statements(statements: Vec<ast::Statement>) -> Object {
+fn eval_statements(statements: Vec<ast::Statement>, env: &mut Environment) -> Object {
     let mut result = Object::Null;
 
     for statement in statements {
-        result = eval(ast::Node::Statement(statement));
+        result = eval(ast::Node::Statement(statement), env);
 
         match result {
             Object::Return(value) => return *value,
@@ -71,7 +98,7 @@ fn eval_bang_operator_expression(right: Object) -> Object {
 fn eval_minus_prefix_operator_expression(right: Object) -> Object {
     match right {
         Object::Integer(i) => Object::Integer(-i),
-        _ => Object::Null,
+        _ => Object::Error(format!("unknown operator: -{}", right.type_name())),
     }
 }
 
@@ -84,7 +111,12 @@ fn eval_infix_expression(operator: String, left: Object, right: Object) -> Objec
             } else if operator == "!=" {
                 Object::Boolean(left != right)
             } else {
-                Object::Null
+                Object::Error(format!(
+                    "unknown operator: {} {} {}",
+                    left.type_name(),
+                    operator,
+                    right.type_name()
+                ))
             }
         }
     }
@@ -110,34 +142,42 @@ fn eval_integer_infix_expression(operator: String, left: Object, right: Object) 
         ">" => Object::Boolean(left_val > right_val),
         "==" => Object::Boolean(left_val == right_val),
         "!=" => Object::Boolean(left_val != right_val),
-        _ => Object::Null,
+        _ => Object::Error(format!(
+            "unknown operator: {} {} {}",
+            left.type_name(),
+            operator,
+            right.type_name()
+        )),
     }
 }
 
-fn eval_if_expression(exp: IfExpression) -> Object {
-    let condition = eval(ast::Node::Expression(*exp.condition));
+fn eval_if_expression(exp: IfExpression, env: &mut Environment) -> Object {
+    let condition = eval(ast::Node::Expression(*exp.condition), env);
 
     if is_truthy(condition) {
-        eval(ast::Node::Statement(ast::Statement::BlockStatement(
-            exp.consequence,
-        )))
+        eval(
+            ast::Node::Statement(ast::Statement::BlockStatement(exp.consequence)),
+            env,
+        )
     } else if exp.alternative.is_some() {
-        return eval(ast::Node::Statement(ast::Statement::BlockStatement(
-            exp.alternative.unwrap(),
-        )));
+        return eval(
+            ast::Node::Statement(ast::Statement::BlockStatement(exp.alternative.unwrap())),
+            env,
+        );
     } else {
         return Object::Null;
     }
 }
 
-fn eval_program(program: Program) -> Object {
+fn eval_program(program: Program, env: &mut Environment) -> Object {
     let mut result = Object::Null;
 
     for statement in program.statements {
-        result = eval(ast::Node::Statement(statement));
+        result = eval(ast::Node::Statement(statement), env);
 
         match result {
             Object::Return(value) => return *value,
+            Object::Error(_) => return result,
             _ => continue,
         }
     }
@@ -145,18 +185,29 @@ fn eval_program(program: Program) -> Object {
     return result;
 }
 
-fn eval_block_statement(block: BlockStatement) -> Object {
+fn eval_block_statement(block: BlockStatement, env: &mut Environment) -> Object {
     let mut result = Object::Null;
 
     for statement in block.statements {
-        result = eval(ast::Node::Statement(statement));
+        result = eval(ast::Node::Statement(statement), env);
 
-        if let Object::Return(_) = result {
-            return result;
+        match result {
+            Object::Return(_) | Object::Error(_) => return result,
+            _ => continue,
         }
     }
 
     result
+}
+
+fn eval_identifier(identifier: ast::Identifier, env: &mut Environment) -> Object {
+    let (value, ok) = env.get(&identifier.value);
+
+    if ok {
+        return value.unwrap().clone();
+    }
+
+    Object::Error(format!("identifier not found: {}", identifier.value))
 }
 
 fn is_truthy(obj: Object) -> bool {
@@ -169,12 +220,14 @@ fn is_truthy(obj: Object) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
+    use anyhow::{Ok, Result};
 
     use super::*;
 
     #[test]
     fn test_integer_expression() -> Result<()> {
+        let mut environment = Environment::new();
+
         let tests = vec![
             ("5", 5),
             ("10", 10),
@@ -198,7 +251,7 @@ mod tests {
             let mut parser = parser::Parser::new(lexer)?;
             let program = parser.parse_program()?;
 
-            let evaluation = eval(ast::Node::Program(program));
+            let evaluation = eval(ast::Node::Program(program), &mut environment);
 
             assert_eq!(evaluation, Object::Integer(expected));
         }
@@ -208,6 +261,8 @@ mod tests {
 
     #[test]
     fn test_boolean_literals() -> Result<()> {
+        let mut environment = Environment::new();
+
         let tests = vec![
             ("true", true),
             ("false", false),
@@ -227,7 +282,7 @@ mod tests {
             let mut parser = parser::Parser::new(lexer)?;
             let program = parser.parse_program()?;
 
-            let evaluation = eval(ast::Node::Program(program));
+            let evaluation = eval(ast::Node::Program(program), &mut environment);
 
             assert_eq!(evaluation, Object::Boolean(expected));
         }
@@ -237,6 +292,8 @@ mod tests {
 
     #[test]
     fn test_bang_prefix() -> Result<()> {
+        let mut environment = Environment::new();
+
         let tests = vec![
             ("!true", false),
             ("!false", true),
@@ -251,7 +308,7 @@ mod tests {
             let mut parser = parser::Parser::new(lexer)?;
             let program = parser.parse_program()?;
 
-            let evaluation = eval(ast::Node::Program(program));
+            let evaluation = eval(ast::Node::Program(program), &mut environment);
 
             assert_eq!(evaluation, Object::Boolean(expected));
         }
@@ -261,6 +318,8 @@ mod tests {
 
     #[test]
     fn test_conditions() -> Result<()> {
+        let mut environment = Environment::new();
+
         let input = "if (true) { 
             if (true) { 
                 return 40; 
@@ -273,9 +332,72 @@ mod tests {
         let mut parser = parser::Parser::new(lexer)?;
         let program = parser.parse_program()?;
 
-        let evaluation = eval(ast::Node::Program(program));
+        let evaluation = eval(ast::Node::Program(program), &mut environment);
 
         assert_eq!(evaluation, Object::Integer(40));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_errors() -> Result<()> {
+        let mut environment = Environment::new();
+
+        let tests = vec![
+            ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
+            ("5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"),
+            ("-true", "unknown operator: -BOOLEAN"),
+            ("true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
+            (
+                "if (10 > 1) { true + false; }",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            (
+                "if (10 > 1) { 
+                    if (10 > 1) { 
+                        return true + false; 
+                    } 
+                    return 1; 
+                }",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            ("foobar", "identifier not found: foobar"),
+        ];
+
+        for (input, expected) in tests {
+            let lexer = lexer::Lexer::new(input.into());
+            let mut parser = parser::Parser::new(lexer)?;
+            let program = parser.parse_program()?;
+
+            let evaluation = eval(ast::Node::Program(program), &mut environment);
+
+            assert_eq!(evaluation, Object::Error(expected.into()));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_environment() -> Result<()> {
+        let mut environment = Environment::new();
+        let tests = [
+            ("let a =5; return a;", 5),
+            ("let a = 5 * 5; return a;", 25),
+            ("let a = 5; let b = a; return b;", 5),
+            ("let a = 5; let b = a; return a + b;", 10),
+            ("let a = 5; let b = a; let c = a + b + 5; return c;", 15),
+        ];
+
+        for (input, expected) in tests {
+            let lexer = lexer::Lexer::new(input.into());
+            let mut parser = parser::Parser::new(lexer)?;
+            let program = parser.parse_program()?;
+
+            let evaluation = eval(ast::Node::Program(program), &mut environment);
+
+            assert_eq!(evaluation, Object::Integer(expected));
+        }
 
         Ok(())
     }

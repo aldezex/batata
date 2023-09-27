@@ -1,9 +1,10 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Object {
     Integer(i64),
     Boolean(bool),
     Null,
     Return(Box<Object>),
+    Error(String),
 }
 
 impl Object {
@@ -13,6 +14,7 @@ impl Object {
             Object::Boolean(b) => b.to_string(),
             Object::Null => "null".to_string(),
             Object::Return(o) => o.inspect(),
+            Object::Error(s) => "ERROR: ".to_string() + s,
         }
     }
 
@@ -22,6 +24,7 @@ impl Object {
             Object::Boolean(_) => "BOOLEAN".to_string(),
             Object::Null => "NULL".to_string(),
             Object::Return(o) => o.type_name(),
+            Object::Error(_) => "ERROR".to_string(),
         }
     }
 }
