@@ -22,7 +22,7 @@ impl std::fmt::Display for Program {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
@@ -41,7 +41,7 @@ impl std::fmt::Display for Statement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LetStatement {
     pub identifier: String,
     pub expression: Option<Expression>,
@@ -53,7 +53,7 @@ impl std::fmt::Display for LetStatement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ReturnStatement {
     pub expression: Expression,
 }
@@ -64,7 +64,7 @@ impl std::fmt::Display for ReturnStatement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<Statement>,
@@ -82,7 +82,7 @@ impl std::fmt::Display for BlockStatement {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Identifier {
     pub token: String,
     pub value: String,
@@ -94,7 +94,7 @@ impl std::fmt::Display for Identifier {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Identifier),
     StringLiteral(String),
@@ -108,7 +108,7 @@ pub enum Expression {
     CallExpression(CallExpression),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Box<Expression>,
@@ -116,14 +116,14 @@ pub struct IfExpression {
     pub alternative: Option<BlockStatement>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<Identifier>,
     pub body: BlockStatement,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CallExpression {
     pub token: Token,
     pub function: Box<Expression>,
@@ -206,7 +206,7 @@ impl std::fmt::Display for CallExpression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Prefix {
     pub token: Token,
     pub operator: String,
@@ -219,7 +219,7 @@ impl std::fmt::Display for Prefix {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Infix {
     pub token: Token,
     pub left: Box<Expression>,

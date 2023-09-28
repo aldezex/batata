@@ -65,8 +65,26 @@ fn eval(node: Node, env: &mut Environment) -> Object {
             ast::Expression::Empty => todo!(),
             ast::Expression::Boolean(boolean) => Object::Boolean(boolean),
             ast::Expression::IfExpression(ifexp) => eval_if_expression(ifexp, env),
-            ast::Expression::FunctionLiteral(_) => todo!(),
-            ast::Expression::CallExpression(_) => todo!(),
+            ast::Expression::FunctionLiteral(function) => Object::Function(object::Function {
+                parameters: function.parameters,
+                body: function.body,
+                env: env.clone(),
+            }),
+            ast::Expression::CallExpression(function) => {
+                let fnn = eval(ast::Node::Expression(*function.function), env);
+
+                if fnn.type_name() == "ERROR" {
+                    return fnn;
+                }
+
+                let arguments = eval_expressions(function.arguments, env);
+
+                if arguments.len() == 1 && arguments[0].type_name() == "ERROR" {
+                    return arguments[0].clone();
+                }
+
+                apply_function(fnn, arguments)
+            }
         },
     }
 }
@@ -208,6 +226,62 @@ fn eval_identifier(identifier: ast::Identifier, env: &mut Environment) -> Object
     }
 
     Object::Error(format!("identifier not found: {}", identifier.value))
+}
+
+fn eval_expressions(expressions: Vec<ast::Expression>, env: &mut Environment) -> Vec<Object> {
+    let mut result = Vec::new();
+
+    for expression in expressions {
+        let evaluated = eval(ast::Node::Expression(expression), env);
+
+        if evaluated.type_name() == "ERROR" {
+            return vec![evaluated];
+        }
+
+        result.push(evaluated);
+    }
+
+    result
+}
+
+fn apply_function(function: Object, args: Vec<Object>) -> Object {
+    match function {
+        Object::Function(f) => {
+            let mut extended_env = extended_function_env(f.clone(), args.clone()).unwrap();
+
+            for (param, arg) in f.parameters.iter().zip(args) {
+                extended_env.set(&param.value, arg);
+            }
+
+            let evaluated = eval(
+                ast::Node::Statement(ast::Statement::BlockStatement(f.body)),
+                &mut extended_env,
+            );
+
+            unwrap_return_value(evaluated)
+        }
+        _ => Object::Error(format!("not a function: {}", function.type_name())),
+    }
+}
+
+fn extended_function_env(
+    function: object::Function,
+    args: Vec<Object>,
+) -> Result<Environment, String> {
+    let mut env = function.env.new_enclosed_environment(function.env.clone());
+
+    for (param, arg) in function.parameters.iter().zip(args) {
+        env.set(&param.value, arg);
+    }
+
+    Ok(env)
+}
+
+fn unwrap_return_value(obj: Object) -> Object {
+    match obj {
+        Object::Return(value) => *value,
+        _ => obj,
+    }
 }
 
 fn is_truthy(obj: Object) -> bool {
@@ -387,6 +461,59 @@ mod tests {
             ("let a = 5; let b = a; return b;", 5),
             ("let a = 5; let b = a; return a + b;", 10),
             ("let a = 5; let b = a; let c = a + b + 5; return c;", 15),
+        ];
+
+        for (input, expected) in tests {
+            let lexer = lexer::Lexer::new(input.into());
+            let mut parser = parser::Parser::new(lexer)?;
+            let program = parser.parse_program()?;
+
+            let evaluation = eval(ast::Node::Program(program), &mut environment);
+
+            assert_eq!(evaluation, Object::Integer(expected));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_object() -> Result<()> {
+        let mut environment = Environment::new();
+
+        let input = "function(x) { x + 2; };";
+
+        let lexer = lexer::Lexer::new(input.into());
+        let mut parser = parser::Parser::new(lexer)?;
+        let program = parser.parse_program()?;
+
+        let evaluation = eval(ast::Node::Program(program), &mut environment);
+
+        match evaluation {
+            Object::Function(f) => {
+                assert_eq!(f.parameters.len(), 1);
+                assert_eq!(f.parameters[0].value, "x");
+                assert_eq!(f.body.statements.len(), 1);
+            }
+            _ => panic!("object is not a function"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_apply() -> Result<()> {
+        let mut environment = Environment::new();
+
+        let tests = [
+            ("let identity = function(x) { return x; }; identity(5);", 5),
+            ("let identity = function(x) { return x; }; identity(5);", 5),
+            ("let double = function(x) { return x * 2; }; double(5);", 10),
+            ("let add = function(x, y) { return x + y; }; add(5, 5);", 10),
+            (
+                "let add = function(x, y) { return x + y; }; add(5 + 5, add(5, 5));",
+                20,
+            ),
+            ("function(x) { return x; }(5)", 5),
         ];
 
         for (input, expected) in tests {
