@@ -1,429 +1,434 @@
-use anyhow::{Ok, Result};
-use super::token::Token;
+use super::{error::LexicalError, token::Token};
+use std::str::FromStr;
 
-pub struct Lexer {
-    input: Vec<u8>,
-    position: usize,
-    read_position: usize,
-    ch: u8,
+pub fn make_tokenizer(source: &str) -> impl Iterator<Item = LexerResult> + '_ {
+    let chars = source.char_indices().map(|(i, c)| (i as u32, c));
+    let nlh = NewlineHandler::new(chars);
+    Lexer::new(nlh)
 }
 
-impl Lexer {
-    pub fn new(input: String) -> Lexer {
-        let mut lexer = Lexer {
-            input: input.into_bytes(),
-            position: 0,
-            read_position: 0,
-            ch: 0,
+struct Lexer<T: Iterator<Item = (u32, char)>> {
+    source: T,
+
+    ch0: Option<char>,
+    ch1: Option<char>,
+    loc0: u32,
+    loc1: u32,
+    loc: u32,
+
+    queue: Vec<Span>,
+}
+
+#[derive(Debug)]
+struct NewlineHandler<T: Iterator<Item = (u32, char)>> {
+    source: T,
+    ch0: Option<(u32, char)>,
+    ch1: Option<(u32, char)>,
+}
+
+impl<T> NewlineHandler<T>
+where
+    T: Iterator<Item = (u32, char)>,
+{
+    fn new(source: T) -> Self {
+        let mut nlh = NewlineHandler {
+            source,
+            ch0: None,
+            ch1: None,
         };
 
-        lexer.read_char();
+        let _ = nlh.shift();
+        let _ = nlh.shift();
+
+        nlh
+    }
+
+    fn shift(&mut self) -> Option<(u32, char)> {
+        let res = self.ch0;
+        self.ch0 = self.ch1;
+        self.ch1 = self.source.next();
+        res
+    }
+}
+
+impl<T> Iterator for NewlineHandler<T>
+where
+    T: Iterator<Item = (u32, char)>,
+{
+    type Item = (u32, char);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((loc, '\r')) = self.ch0 {
+            if let Some((_, '\n')) = self.ch1 {
+                let _ = self.shift();
+                self.ch0 = Some((loc, '\n'));
+            } else {
+                self.ch0 = Some((loc, '\n'));
+            }
+        }
+
+        self.shift()
+    }
+}
+
+pub type Span = (u32, Token, u32);
+pub type LexerResult = Result<Span, LexicalError>;
+
+impl<T: Iterator<Item = (u32, char)>> Lexer<T> {
+    pub fn new(source: T) -> Self {
+        let mut lexer = Lexer {
+            source,
+            ch0: None,
+            ch1: None,
+            loc0: 0,
+            loc1: 0,
+            loc: 0,
+            queue: Vec::new(),
+        };
+
+        let _ = lexer.read_char();
+        let _ = lexer.read_char();
+        lexer.loc = 0;
 
         lexer
     }
 
-    pub fn read_char(&mut self) {
-        if self.read_position >= self.input.len() {
-            self.ch = 0;
-        } else {
-            self.ch = self.input[self.read_position];
+    fn inner_next(&mut self) -> LexerResult {
+        while self.queue.is_empty() {
+            self.read_token()?;
         }
 
-        self.position = self.read_position;
-        self.read_position += 1;
+        Ok(self.queue.remove(0))
     }
 
-    pub fn next_token(&mut self) -> Result<Token> {
-        use Token::*;
+    fn read_token(&mut self) -> Result<(), LexicalError> {
+        if let Some(c) = self.ch0 {
+            // identifiers, keywords, etc...
+            if c.is_ascii_alphabetic() || c == '_' {
+                let t = self.read_identifier()?;
+                self.add_token(t);
+            }
 
-        self.skip_whitespace();
+            // strings
+            if c == '"' {
+                let t = self.read_string()?;
+                self.add_token(t);
+            }
 
-        let token = match self.ch {
-            0 => Eof,
+            // numbers
+            if c.is_ascii_digit() {
+                let num = self.read_number()?;
+                self.add_token(num);
+            }
 
-            b'=' => {
-                if self.peek() == b'=' {
-                    self.read_char();
-
-                    if self.peek() == b'=' {
-                        self.read_char();
-                        return Ok(StrictEqual);
-                    }
-
-                    self.read_char();
-
-                    return Ok(Equal);
+            // newlines
+            if c == '\n' || c == ' ' || c == '\t' || c == '\x0C' {
+                let token_position = self.get_position();
+                let _ = self.read_char();
+                let token_position_end = self.get_position();
+                if c == '\n' {
+                    self.add_token((token_position, Token::Newline, token_position_end));
                 }
-
-                self.read_char();
-
-                return Ok(Assign);
             }
 
-            b'>' => {
-                if self.peek() == b'=' {
-                    self.read_char();
-                    self.read_char();
+            // enclosures
+            if c == '(' {
+                let t = self.read_single_char(Token::LParen)?;
+                self.add_token(t);
+            }
 
-                    return Ok(GreaterThanEqual);
+            if c == ')' {
+                let t = self.read_single_char(Token::RParen)?;
+                self.add_token(t);
+            }
+
+            if c == '{' {
+                let t = self.read_single_char(Token::LBrace)?;
+                self.add_token(t);
+            }
+
+            if c == '}' {
+                let t = self.read_single_char(Token::RBrace)?;
+                self.add_token(t);
+            }
+
+            if c == '[' {
+                let t = self.read_single_char(Token::LBracket)?;
+                self.add_token(t);
+            }
+
+            if c == ']' {
+                let t = self.read_single_char(Token::RBracket)?;
+                self.add_token(t);
+            }
+
+            // separators
+            if c == ';' {
+                let t = self.read_single_char(Token::Semicolon)?;
+                self.add_token(t);
+            }
+
+            if c == ':' {
+                let t = self.read_single_char(Token::Colon)?;
+                self.add_token(t);
+            }
+
+            if c == '.' {
+                let t = self.read_single_char(Token::Dot)?;
+                self.add_token(t);
+            }
+
+            // operators
+            if c == '+' {
+                let t = self.read_single_char(Token::Plus)?;
+                self.add_token(t);
+            }
+
+            if c == '-' {
+                let t = self.read_single_char(Token::Minus)?;
+                self.add_token(t);
+            }
+
+            if c == '*' {
+                let t = self.read_single_char(Token::Star)?;
+                self.add_token(t);
+            }
+
+            if c == '/' {
+                let t = self.read_single_char(Token::Slash)?;
+                self.add_token(t);
+            }
+
+            if c == '%' {
+                let t = self.read_single_char(Token::Percent)?;
+                self.add_token(t);
+            }
+
+            if c == '=' {
+                if self.ch1 == Some('=') {
+                    let token_position = self.get_position();
+                    let _ = self.read_char();
+                    let _ = self.read_char();
+                    let token_position_end = self.get_position();
+                    self.add_token((token_position, Token::Equal, token_position_end));
+                } else {
+                    let t = self.read_single_char(Token::Assign)?;
+                    self.add_token(t);
                 }
-
-                self.read_char();
-
-                return Ok(GreaterThan);
             }
-            b'<' => {
-                if self.peek() == b'=' {
-                    self.read_char();
-                    self.read_char();
 
-                    return Ok(LessThanEqual);
+            if c == '!' {
+                if self.ch1 == Some('=') {
+                    let token_position = self.get_position();
+                    let _ = self.read_char();
+                    let _ = self.read_char();
+                    let token_position_end = self.get_position();
+                    self.add_token((token_position, Token::NotEqual, token_position_end));
+                } else {
+                    let t = self.read_single_char(Token::Bang)?;
+                    self.add_token(t);
                 }
-
-                self.read_char();
-
-                return Ok(LessThan);
             }
 
-            b'+' => Plus,
-            b'-' => Minus,
-            b'*' => Asterisk,
-            b'/' => Slash,
-            b'!' => {
-                if self.peek() == b'=' {
-                    self.read_char();
-                    self.read_char();
-
-                    return Ok(NotEqual);
+            if c == '<' {
+                if self.ch1 == Some('=') {
+                    let token_position = self.get_position();
+                    let _ = self.read_char();
+                    let _ = self.read_char();
+                    let token_position_end = self.get_position();
+                    self.add_token((token_position, Token::LessThanEqual, token_position_end));
+                } else {
+                    let t = self.read_single_char(Token::LessThan)?;
+                    self.add_token(t);
                 }
-
-                self.read_char();
-                return Ok(Bang);
             }
 
-            b',' => Comma,
-            b';' => Semicolon,
-
-            b'(' => Lparen,
-            b')' => Rparen,
-            b'{' => Lbrace,
-            b'}' => Rbrace,
-
-            b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
-                let identifier = self.read_identifier();
-
-                return Ok(match identifier.as_str() {
-                    "let" => Let,
-                    "var" => Var,
-                    "const" => Const,
-                    "function" => Function,
-                    "if" => If,
-                    "else" => Else,
-                    "return" => Return,
-                    "async" => Async,
-                    "await" => Await,
-                    "true" => True,
-                    "false" => False,
-                    _ => return Ok(Ident(identifier)),
-                });
-            }
-
-            b'0'..=b'9' => {
-                let number = self.read_number();
-                return Ok(Token::Int(number.parse::<isize>().unwrap()));
-            }
-
-            b'"' => {
-                self.read_char();
-
-                let mut string = String::new();
-
-                while self.ch != b'"' {
-                    string.push(self.ch as char);
-                    self.read_char();
+            if c == '>' {
+                if self.ch1 == Some('=') {
+                    let token_position = self.get_position();
+                    let _ = self.read_char();
+                    let _ = self.read_char();
+                    let token_position_end = self.get_position();
+                    self.add_token((token_position, Token::GreaterThanEqual, token_position_end));
+                } else {
+                    let t = self.read_single_char(Token::GreaterThan)?;
+                    self.add_token(t);
                 }
-
-                self.read_char();
-
-                return Ok(Token::Str(string));
             }
 
-            b'\'' => {
-                self.read_char();
-
-                let mut string = String::new();
-
-                while self.ch != b'\'' {
-                    string.push(self.ch as char);
-                    self.read_char();
+            if c == '&' {
+                if self.ch1 == Some('&') {
+                    let token_position = self.get_position();
+                    let _ = self.read_char();
+                    let _ = self.read_char();
+                    let token_position_end = self.get_position();
+                    self.add_token((token_position, Token::And, token_position_end));
+                } else {
+                    return Err(LexicalError::UnrecognizedToken(String::from(c)));
                 }
-
-                self.read_char();
-
-                return Ok(Token::Str(string));
             }
 
-            _ => Illegal,
+            if c == '|' {
+                if self.ch1 == Some('|') {
+                    let token_position = self.get_position();
+                    let _ = self.read_char();
+                    let _ = self.read_char();
+                    let token_position_end = self.get_position();
+                    self.add_token((token_position, Token::Or, token_position_end));
+                } else {
+                    return Err(LexicalError::UnrecognizedToken(String::from(c)));
+                }
+            }
+        } else {
+            let token_position = self.get_position();
+            self.add_token((token_position, Token::Eof, token_position));
+        }
+
+        Ok(())
+    }
+
+    fn read_identifier(&mut self) -> LexerResult {
+        let mut ident = String::new();
+        let token_position = self.get_position();
+
+        while let Some(c) = self.ch0 {
+            if c.is_ascii_alphabetic() || c == '_' {
+                ident.push(c);
+                let _ = self.read_char();
+            } else {
+                break;
+            }
+        }
+
+        let token_position_end = self.get_position();
+        let token = Token::from_str(&ident)?;
+
+        Ok((token_position, token, token_position_end))
+    }
+
+    fn read_string(&mut self) -> LexerResult {
+        let mut ident = String::new();
+        let token_position = self.get_position();
+
+        // add the opening quote
+        ident.push('"');
+        let _ = self.read_char();
+
+        while let Some(c) = self.ch0 {
+            if c != '"' {
+                ident.push(c);
+                let _ = self.read_char();
+            } else {
+                break;
+            }
+        }
+
+        // add the closing quote
+        ident.push('"');
+        let _ = self.read_char();
+
+        let token_position_end = self.get_position();
+        let token = Token::from_str(&ident)?;
+
+        Ok((token_position, token, token_position_end))
+    }
+
+    fn read_number(&mut self) -> LexerResult {
+        let mut num = String::new();
+        let token_position = self.get_position();
+
+        while let Some(c) = self.ch0 {
+            match c {
+                '0'..='9' | '_' | '.' => {
+                    num.push(c);
+                    let _ = self.read_char();
+                }
+                _ => break,
+            }
+        }
+
+        if has_more_than_one_occurences(&num, '.') {
+            return Err(LexicalError::InvalidFloatNumberMultipleDots(num));
+        }
+
+        if num.contains('_') && !number_has_matching_underscores(&num) {
+            return Err(LexicalError::InvalidNumberUnderscores(num));
+        }
+
+        let token_position_end = self.get_position();
+        let token = if num.contains('.') {
+            Token::Float { value: num }
+        } else {
+            Token::Int { value: num }
         };
 
-        self.read_char();
-        Ok(token)
+        Ok((token_position, token, token_position_end))
     }
 
-    fn read_identifier(&mut self) -> String {
-        let position = self.position;
-
-        while self.ch.is_ascii_alphabetic() || self.ch == b'_' {
-            self.read_char();
-        }
-
-        String::from_utf8_lossy(&self.input[position..self.position]).to_string()
+    fn read_single_char(&mut self, token: Token) -> LexerResult {
+        let token_position = self.get_position();
+        let _ = self.read_char();
+        let token_position_end = self.get_position();
+        Ok((token_position, token, token_position_end))
     }
 
-    fn read_number(&mut self) -> String {
-        let position = self.position;
-
-        while self.ch.is_ascii_digit() {
-            self.read_char();
-        }
-
-        String::from_utf8_lossy(&self.input[position..self.position]).to_string()
+    fn add_token(&mut self, token: Span) {
+        self.queue.push(token);
     }
 
-    fn skip_whitespace(&mut self) {
-        while self.ch.is_ascii_whitespace() {
-            self.read_char();
-        }
+    fn get_position(&self) -> u32 {
+        self.loc0
     }
 
-    fn peek(&self) -> u8 {
-        if self.read_position >= self.input.len() {
-            return 0;
-        }
+    fn read_char(&mut self) -> Option<char> {
+        let c = self.ch0;
+        let next = match self.source.next() {
+            Some((loc, c)) => {
+                self.loc0 = self.loc1;
+                self.loc1 = loc;
+                Some(c)
+            }
+            None => {
+                self.loc0 = self.loc1;
+                self.loc1 += 1;
+                None
+            }
+        };
 
-        self.input[self.read_position]
+        self.ch0 = self.ch1;
+        self.ch1 = next;
+        c
+    }
+}
+
+impl<T> Iterator for Lexer<T>
+where
+    T: Iterator<Item = (u32, char)>,
+{
+    type Item = LexerResult;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = self.inner_next();
+
+        match token {
+            Ok((_, Token::Eof, _)) => None,
+            r => Some(r),
+        }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::Lexer;
-    use crate::parser::token::Token::*;
-    use anyhow::Result;
-
-    #[test]
-    fn next_token() -> Result<()> {
-        let input = "=+(){},;";
-
-        let mut lexer = Lexer::new(input.into());
-
-        let tokens = vec![
-            Assign, Plus, Lparen, Rparen, Lbrace, Rbrace, Comma, Semicolon, Eof,
-        ];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
+pub fn has_more_than_one_occurences(source: &str, char: char) -> bool {
+    let mut count = 0;
+    for c in source.chars() {
+        if c == char {
+            count += 1;
         }
-
-        Ok(())
     }
 
-    #[test]
-    fn input_with_function() -> Result<()> {
-        let input = r#"let five = 5;
-        let ten = 10;
-        let add = function(x, y) {
-            x + y;
-        };"#;
-
-        let mut lexer = Lexer::new(input.into());
-
-        let tokens = vec![
-            Let,
-            Ident("five".into()),
-            Assign,
-            Int(5),
-            Semicolon,
-            Let,
-            Ident("ten".into()),
-            Assign,
-            Int(10),
-            Semicolon,
-            Let,
-            Ident("add".into()),
-            Assign,
-            Function,
-            Lparen,
-            Ident("x".into()),
-            Comma,
-            Ident("y".into()),
-            Rparen,
-            Lbrace,
-            Ident("x".into()),
-            Plus,
-            Ident("y".into()),
-            Semicolon,
-            Rbrace,
-            Semicolon,
-            Eof,
-        ];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn comparators() -> Result<()> {
-        let input = "=";
-        let mut lexer = Lexer::new(input.into());
-        let tokens = vec![Assign];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        let input = "==";
-        let mut lexer = Lexer::new(input.into());
-        let tokens = vec![Equal];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        let input = "===";
-        let mut lexer = Lexer::new(input.into());
-        let tokens = vec![StrictEqual];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        let input = "<";
-        let mut lexer = Lexer::new(input.into());
-        let tokens = vec![LessThan];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        let input = ">";
-        let mut lexer = Lexer::new(input.into());
-        let tokens = vec![GreaterThan];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        let input = "<=";
-        let mut lexer = Lexer::new(input.into());
-        let tokens = vec![LessThanEqual];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        let input = ">=";
-        let mut lexer = Lexer::new(input.into());
-        let tokens = vec![GreaterThanEqual];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn keywords() -> Result<()> {
-        let input = r#"
-            const alvaro
-            let tata
-            var macarena;
-            if else
-            return
-            async await
-        "#;
-        let mut lexer = Lexer::new(input.into());
-
-        let tokens = vec![
-            Const,
-            Ident("alvaro".into()),
-            Let,
-            Ident("tata".into()),
-            Var,
-            Ident("macarena".into()),
-            Semicolon,
-            If,
-            Else,
-            Return,
-            Async,
-            Await,
-        ];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_strings() -> Result<()> {
-        let input = r#"
-            "hello world"
-            'hello world'
-        "#;
-        let mut lexer = Lexer::new(input.into());
-
-        let tokens = vec![Str("hello world".into()), Str("hello world".into())];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn integer_literals_equal() -> Result<()> {
-        let input = r#"
-            5 == 5;
-        "#;
-        let mut lexer = Lexer::new(input.into());
-
-        let tokens = vec![Int(5), Equal, Int(5), Semicolon, Eof];
-
-        for token in tokens {
-            let tok = lexer.next_token()?;
-            println!("Expected: {}, got: {}", token, tok);
-            assert_eq!(tok, token);
-        }
-
-        Ok(())
-    }
+    count > 1
 }
+
+pub fn number_has_matching_underscores(source: &str) -> bool {
+    todo!()
+}
+

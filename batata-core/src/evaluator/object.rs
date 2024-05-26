@@ -1,3 +1,4 @@
+/*
 use crate::ast::standard::{BlockStatement, Identifier, Statement};
 
 use super::environment::Environment;
@@ -50,3 +51,4 @@ pub struct Function {
     pub body: BlockStatement,
     pub env: Environment,
 }
+*/

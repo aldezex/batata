@@ -1,134 +1,133 @@
-use std::fmt::{Display, Formatter, Result};
+use std::{fmt::Display, str::FromStr};
 
-#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord, Hash)]
+use super::error::LexicalError;
+
+#[derive(Debug, PartialEq)]
 pub enum Token {
-    Illegal,
-    Eof,
+    Identifier { name: String },
+    DiscardIdentifier { name: String },
+    String { value: String },
+    Int { value: String },
+    Float { value: String },
 
-    Ident(String),
-    Int(isize),
-    // Float(f32),
-    Str(String),
-
-    Assign,
-    Plus,
-    Minus,
-    Asterisk,
-    Slash,
-    Bang,
-
-    Equal,
-    NotEqual,
-    StrictEqual,
-    LessThan,
-    GreaterThan,
-    LessThanEqual,
-    GreaterThanEqual,
-
-    Comma,
-    Semicolon,
-
-    Lparen,
-    Rparen,
-    Lbrace,
-    Rbrace,
-
-    Function,
+    // keywords
+    Import,
     Let,
-    Const,
-    Var,
+    Mut,
+    Fn,
+    Return,
     If,
     Else,
-    Return,
-    Async,
-    Await,
 
-    DoubleQuote,
-    SingleQuote,
+    // enclosures
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
 
-    True,
-    False,
+    // separators
+    Newline,
+    Semicolon,
+    Colon,
+    Dot,
+
+    // operators
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanEqual,
+    GreaterThan,
+    GreaterThanEqual,
+    And,
+    Or,
+    Bang,
+    Assign,
+
+    // terminals
+    Eof,
 }
 
 impl Display for Token {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        use Token::*;
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ts = match self {
+            Token::Identifier { name } => name,
+            Token::DiscardIdentifier { name } => name,
+            Token::String { value } => value,
+            Token::Int { value } => value,
+            Token::Float { value } => value,
+            Token::Import => "import",
+            Token::Let => "let",
+            Token::Mut => "mut",
+            Token::Fn => "fn",
+            Token::Return => "return",
+            Token::If => "if",
+            Token::Else => "else",
+            Token::LParen => "(",
+            Token::RParen => ")",
+            Token::LBrace => "{",
+            Token::RBrace => "}",
+            Token::LBracket => "[",
+            Token::RBracket => "]",
+            Token::Newline => "newline",
+            Token::Semicolon => ";",
+            Token::Colon => ":",
+            Token::Dot => ".",
+            Token::Plus => "+",
+            Token::Minus => "-",
+            Token::Star => "*",
+            Token::Slash => "/",
+            Token::Percent => "%",
+            Token::Equal => "==",
+            Token::NotEqual => "!=",
+            Token::LessThan => "<",
+            Token::LessThanEqual => "<=",
+            Token::GreaterThan => ">",
+            Token::GreaterThanEqual => ">=",
+            Token::And => "&&",
+            Token::Or => "||",
+            Token::Bang => "!",
+            Token::Eof => "EOF",
+            Token::Assign => "=",
+        };
 
-        match self {
-            Illegal => write!(f, "illegal"),
-            Eof => write!(f, "eof"),
-
-            Ident(s) => write!(f, "ident({})", s),
-            Int(i) => write!(f, "int({})", i),
-            // Float(fl) => write!(f, "float({})", fl),
-            Str(s) => write!(f, "str({})", s),
-
-            Assign => write!(f, "assign"),
-            Plus => write!(f, "plus"),
-            Minus => write!(f, "minus"),
-            Asterisk => write!(f, "asterisk"),
-            Slash => write!(f, "slash"),
-
-            Bang => write!(f, "bang"),
-
-            Equal => write!(f, "equal"),
-            NotEqual => write!(f, "notEqual"),
-            StrictEqual => write!(f, "strictEqual"),
-            LessThan => write!(f, "lessThan"),
-            GreaterThan => write!(f, "greaterThan"),
-            LessThanEqual => write!(f, "lessThanEqual"),
-            GreaterThanEqual => write!(f, "greaterThanEqual"),
-
-            Comma => write!(f, "comma"),
-            Semicolon => write!(f, "semicolon"),
-
-            Lparen => write!(f, "lparen"),
-            Rparen => write!(f, "rparen"),
-            Lbrace => write!(f, "lbrace"),
-            Rbrace => write!(f, "rbrace"),
-
-            Function => write!(f, "function"),
-            Let => write!(f, "let"),
-            Const => write!(f, "const"),
-            Var => write!(f, "var"),
-            If => write!(f, "if"),
-            Else => write!(f, "else"),
-            Return => write!(f, "return"),
-            Async => write!(f, "async"),
-            Await => write!(f, "await"),
-
-            DoubleQuote => write!(f, "doubleQuote"),
-            SingleQuote => write!(f, "singleQuote"),
-
-            True => write!(f, "true"),
-            False => write!(f, "false"),
-        }
+        write!(f, "{ts}")
     }
 }
 
-impl Token {
-    pub fn literal(&self) -> String {
-        use Token::*;
+impl FromStr for Token {
+    type Err = LexicalError;
 
-        match self {
-            Ident(s) => s.clone(),
-            Int(i) => i.to_string(),
-            // Float(fl) => fl.to_string(),
-            Return => "return".to_string(),
-            Str(s) => s.clone(),
-            Bang => "!".to_string(),
-            Minus => "-".to_string(),
-            Slash => "/".to_string(),
-            Asterisk => "*".to_string(),
-            Plus => "+".to_string(),
-            Equal => "==".to_string(),
-            NotEqual => "!=".to_string(),
-            StrictEqual => "===".to_string(),
-            LessThan => "<".to_string(),
-            GreaterThan => ">".to_string(),
-            LessThanEqual => "<=".to_string(),
-            GreaterThanEqual => ">=".to_string(),
-            _ => String::new(),
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "import" => Ok(Token::Import),
+            "let" => Ok(Token::Let),
+            "mut" => Ok(Token::Mut),
+            "fn" => Ok(Token::Fn),
+            "return" => Ok(Token::Return),
+            "if" => Ok(Token::If),
+            "else" => Ok(Token::Else),
+            _ => {
+                if s.starts_with('_') {
+                    Ok(Token::DiscardIdentifier {
+                        name: s.to_string(),
+                    })
+                } else if s.starts_with('"') && s.ends_with('"') {
+                    Ok(Token::String {
+                        value: s[1..s.len() - 1].to_string(),
+                    })
+                } else {
+                    Ok(Token::Identifier {
+                        name: s.to_string(),
+                    })
+                }
+            }
         }
     }
 }

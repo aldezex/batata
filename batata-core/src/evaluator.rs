@@ -1,3 +1,4 @@
+/*
 use environment::Environment;
 use object::Object;
 
@@ -532,3 +533,4 @@ mod tests {
         Ok(())
     }
 }
+*/

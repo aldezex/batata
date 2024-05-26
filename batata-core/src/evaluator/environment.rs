@@ -1,3 +1,4 @@
+/*
 use std::collections::HashMap;
 
 use super::object::Object;
@@ -37,3 +38,4 @@ impl Environment {
         env
     }
 }
+*/
