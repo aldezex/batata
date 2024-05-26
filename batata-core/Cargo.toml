@@ -1,0 +1,13 @@
+[package]
+name = "batata-core"
+version = "0.0.1"
+edition = "2021"
+authors = ["Álvaro Hernández <alvarohdezex@gmail.com>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+itertools = "0.13.0"
+thiserror = "1"
+
