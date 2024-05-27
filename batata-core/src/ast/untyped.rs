@@ -39,7 +39,7 @@ pub struct Definition {
 
 impl std::fmt::Display for Definition {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "let {} = {}", self.name, self.value)
+        write!(f, "let {} = {};", self.name, self.value)
     }
 }
 
@@ -56,6 +56,8 @@ impl std::fmt::Display for Expression {
 pub enum ExpressionKind {
     Integer(String),
     Infix(Infix),
+    Identifier(String),
+    DiscardIdentifier(String),
 }
 
 impl std::fmt::Display for ExpressionKind {
@@ -65,6 +67,8 @@ impl std::fmt::Display for ExpressionKind {
             ExpressionKind::Infix(infix) => {
                 write!(f, "({} {} {})", infix.left, infix.operator, infix.right)
             }
+            ExpressionKind::Identifier(name) => write!(f, "{}", name),
+            ExpressionKind::DiscardIdentifier(name) => write!(f, "_{}", name),
         }
     }
 }

@@ -148,4 +148,13 @@ impl Token {
             _ => 0,
         }
     }
+
+    pub fn is_terminal(&self) -> bool {
+        match self {
+            Token::Eof => true,
+            Token::Newline => true,
+            Token::Semicolon => true,
+            _ => false,
+        }
+    }
 }

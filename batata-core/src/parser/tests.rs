@@ -2,8 +2,18 @@ use super::parse_module;
 
 #[test]
 fn test_parse_module() {
-    let input = "1 * 2 + 3 / 6 * 2 % 9;";
+    let input = r#"let x = 1 + 2 * 3;
+        let y = 4 / 5;
+        let z = 6 - 7;
+        let a = y + z * x;
+        "#;
     let parsed = parse_module(input).unwrap();
-    println!("parsed: {}", parsed.module);
-    assert_eq!(parsed.module.statements.len(), 1);
+
+    assert_eq!(parsed.module.statements.len(), 4);
+    assert_eq!(
+        parsed.module.to_string(),
+        String::from(
+            r#"let x = (1 + (2 * 3));let y = (4 / 5);let z = (6 - 7);let a = (y + (z * x));"#
+        )
+    );
 }

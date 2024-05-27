@@ -24,7 +24,6 @@ pub fn parse_module(input: &str) -> Result<Parsed, ParseError> {
 pub struct Parser<T: Iterator<Item = LexerResult>> {
     tokens: T,
     lexer_errors: Vec<LexicalError>,
-    parser_errors: Vec<ParseError>,
     tok0: Option<Span>,
     tok1: Option<Span>,
 }
@@ -37,7 +36,6 @@ where
         let mut parser = Parser {
             tokens: lexer,
             lexer_errors: Vec::new(),
-            parser_errors: Vec::new(),
             tok0: None,
             tok1: None,
         };
@@ -75,6 +73,11 @@ where
         };
 
         while let Some(tok) = self.tok0.take() {
+            if tok.1 == Token::Newline {
+                self.next_token();
+                continue;
+            }
+
             let statement = self.parse_statement(tok)?;
             program.statements.push(statement);
             self.next_token();
@@ -85,8 +88,52 @@ where
 
     fn parse_statement(&mut self, token: Span) -> Result<Statement, ParseError> {
         match token.1 {
+            Token::Let => self.parse_let_statement(),
             _ => self.parse_expression_statement(token),
         }
+    }
+
+    fn parse_let_statement(&mut self) -> Result<Statement, ParseError> {
+        let name = self.expect_identifier()?;
+        if !self.peek_token_is(Token::Assign) {
+            return Err(ParseError::InvalidToken(
+                self.tok0.as_ref().unwrap().1.to_string(),
+            ));
+        }
+
+        // consume tokens and reset the stream
+        self.next_token();
+        self.next_token();
+
+        let curr_token = self.tok0.clone().unwrap();
+        let value = self.parse_expression(curr_token, 0)?;
+
+        if !self.peek_token_is(Token::Semicolon) {
+            return Err(ParseError::InvalidToken(
+                self.tok0.as_ref().unwrap().1.to_string(),
+            ));
+        }
+
+        self.next_token();
+
+        Ok(Statement::Definition(ast::untyped::Definition {
+            name,
+            value,
+        }))
+    }
+
+    fn expect_identifier(&mut self) -> Result<String, ParseError> {
+        self.next_token();
+
+        let name = match self.tok0.take() {
+            Some(tok) => match tok.1 {
+                Token::Identifier { name } | Token::DiscardIdentifier { name } => Ok(name),
+                _ => Err(ParseError::InvalidToken(tok.1.to_string())),
+            },
+            None => Err(ParseError::UnexpectedEof),
+        };
+
+        name
     }
 
     fn parse_expression_statement(&mut self, token: Span) -> Result<Statement, ParseError> {
@@ -100,7 +147,7 @@ where
     }
 
     fn parse_expression(&mut self, token: Span, precedence: u8) -> Result<Expression, ParseError> {
-        let mut prefix = self.parse_prefix(token)?;
+        let mut left = self.parse_prefix(token)?;
 
         while let Some(tok) = self.tok1.clone() {
             let next_precedence = self.peek_token_precedence();
@@ -109,16 +156,22 @@ where
             }
 
             self.next_token();
-            prefix = self.parse_infix(tok, prefix)?;
+            left = self.parse_infix(tok, left)?;
         }
 
-        Ok(prefix)
+        Ok(left)
     }
 
     fn parse_prefix(&mut self, token: Span) -> Result<Expression, ParseError> {
         match token.1 {
             Token::Int { value } => Ok(Expression {
                 kind: ExpressionKind::Integer(value),
+            }),
+            Token::Identifier { name } => Ok(Expression {
+                kind: ExpressionKind::Identifier(name),
+            }),
+            Token::DiscardIdentifier { name } => Ok(Expression {
+                kind: ExpressionKind::DiscardIdentifier(name),
             }),
             _ => Err(ParseError::InvalidToken(token.1.to_string())),
         }
@@ -140,7 +193,7 @@ where
         })
     }
 
-    fn peek_token_is(&self, token: Token) -> bool {
+    fn peek_token_is(&mut self, token: Token) -> bool {
         self.tok1.as_ref().map_or(false, |tok| tok.1 == token)
     }
 
