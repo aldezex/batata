@@ -32,4 +32,6 @@ pub enum ParseError {
     ExpectedToken(String, String),
     #[error("Expected Integer, found: {0}")]
     ExpectedInteger(String),
+    #[error("Unexpected EOF")]
+    UnexpectedEof,
 }
