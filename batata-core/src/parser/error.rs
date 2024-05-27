@@ -22,6 +22,8 @@ pub enum LexicalError {
 pub enum ParseError {
     #[error("Invalid token: {0}")]
     InvalidToken(String),
+    #[error("Unexpected token: {0}")]
+    UnexpectedToken(String),
     #[error("Invalid let statement, expected {0}, found: {1}")]
     BadLetStatement(String, String),
     #[error("Expected semicolon")]
@@ -31,4 +33,3 @@ pub enum ParseError {
     #[error("Expected Integer, found: {0}")]
     ExpectedInteger(String),
 }
-

@@ -131,3 +131,21 @@ impl FromStr for Token {
         }
     }
 }
+
+impl Token {
+    pub fn get_precedence(&self) -> u8 {
+        match self {
+            Token::Assign => 1,
+            Token::Or => 2,
+            Token::And => 3,
+            Token::Equal | Token::NotEqual => 4,
+            Token::LessThan
+            | Token::LessThanEqual
+            | Token::GreaterThan
+            | Token::GreaterThanEqual => 5,
+            Token::Plus | Token::Minus => 6,
+            Token::Star | Token::Slash | Token::Percent => 7,
+            _ => 0,
+        }
+    }
+}

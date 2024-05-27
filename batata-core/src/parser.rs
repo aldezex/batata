@@ -3,7 +3,10 @@ mod lexer;
 mod tests;
 mod token;
 
-use crate::ast::{self, untyped::{Parsed, Module, Statement}};
+use crate::ast::{
+    self,
+    untyped::{Expression, ExpressionKind, Infix, Module, Parsed, Statement},
+};
 
 use self::{
     error::{LexicalError, ParseError},
@@ -72,23 +75,78 @@ where
         };
 
         while let Some(tok) = self.tok0.take() {
-            match tok.1 {
-                Token::Eof => break,
-                tok => {
-                    self.next_token();
-                    let statement = self.parse_statement(tok)?;
-                    program.statements.push(statement);
-                }
-            }
+            let statement = self.parse_statement(tok)?;
+            program.statements.push(statement);
+            self.next_token();
         }
 
         Ok(program)
     }
 
-    fn parse_statement(&self, tok: Token) -> Result<Statement, ParseError> {
-        match tok {
-            _ => self.parse_expression(),
+    fn parse_statement(&mut self, token: Span) -> Result<Statement, ParseError> {
+        match token.1 {
+            _ => self.parse_expression_statement(token),
         }
+    }
+
+    fn parse_expression_statement(&mut self, token: Span) -> Result<Statement, ParseError> {
+        let expression = self.parse_expression(token, 0)?;
+        Ok(Statement::Expression(expression))
+    }
+
+    fn parse_expression(&mut self, token: Span, precedence: u8) -> Result<Expression, ParseError> {
+        let mut prefix = self.parse_prefix(token)?;
+
+        while !self.peek_token_is(Token::Semicolon) && precedence < self.peek_token_precedence() {
+            if let Some(tok) = self.tok1.take() {
+                let infix = self.parse_infix(tok, prefix)?;
+                prefix = infix;
+            }
+        }
+
+        Ok(prefix)
+    }
+
+    fn parse_prefix(&mut self, token: Span) -> Result<Expression, ParseError> {
+        match token.1 {
+            Token::Int { value } => Ok(Expression {
+                kind: ExpressionKind::Integer(value),
+            }),
+            _ => Err(ParseError::InvalidToken(token.1.to_string())),
+        }
+    }
+
+    fn parse_infix(&mut self, tok: Span, left: Expression) -> Result<Expression, ParseError> {
+        let precedence = self.current_precedence();
+        self.next_token();
+        self.next_token();
+
+        if let Some(token) = self.tok0.take() {
+            let right = self.parse_expression(token, precedence)?;
+            let expression = Expression {
+                kind: ExpressionKind::Infix(Infix {
+                    left: Box::new(left),
+                    operator: tok.1.to_string(),
+                    right: Box::new(right),
+                }),
+            };
+
+            return Ok(expression);
+        }
+
+        Err(ParseError::InvalidToken(tok.1.to_string()))
+    }
+
+    fn peek_token_is(&self, token: Token) -> bool {
+        self.tok1.as_ref().map_or(false, |tok| tok.1 == token)
+    }
+
+    fn current_precedence(&self) -> u8 {
+        self.tok0.as_ref().map_or(0, |tok| tok.1.get_precedence())
+    }
+
+    fn peek_token_precedence(&self) -> u8 {
+        self.tok1.as_ref().map_or(0, |tok| tok.1.get_precedence())
     }
 }
 
