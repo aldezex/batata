@@ -102,8 +102,26 @@ where
     fn parse_statement(&mut self, token: Span) -> Result<Statement, ParseError> {
         match token.1 {
             Token::Let => self.parse_let_statement(),
+            Token::LBrace => self.parse_block_statement(),
             _ => self.parse_expression_statement(token),
         }
+    }
+
+    fn parse_block_statement(&mut self) -> Result<Statement, ParseError> {
+        self.next_token();
+        let mut statements = Vec::new();
+
+        while let Some(tok) = self.tok0.take() {
+            if tok.1 == Token::RBrace {
+                break;
+            }
+
+            let statement = self.parse_statement(tok)?;
+            statements.push(statement);
+            self.next_token();
+        }
+
+        Ok(Statement::Block(ast::untyped::Block { statements }))
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, ParseError> {
