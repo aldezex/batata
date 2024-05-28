@@ -26,6 +26,7 @@ pub struct Parser<T: Iterator<Item = LexerResult>> {
     lexer_errors: Vec<LexicalError>,
     tok0: Option<Span>,
     tok1: Option<Span>,
+    pub newlines_position: Vec<u32>,
 }
 
 impl<T> Parser<T>
@@ -38,6 +39,7 @@ where
             lexer_errors: Vec::new(),
             tok0: None,
             tok1: None,
+            newlines_position: Vec::new(),
         };
 
         parser.next_token();
@@ -49,17 +51,28 @@ where
         let tok = self.tok0.take();
         let mut next;
 
-        match self.tokens.next() {
-            Some(Err(err)) => {
-                self.lexer_errors.push(err);
-                next = None;
-            }
+        loop {
+            match self.tokens.next() {
+                Some(Ok((start, Token::Newline, _))) => {
+                    self.newlines_position.push(start);
+                }
 
-            Some(Ok(tok)) => {
-                next = Some(tok);
-            }
+                Some(Err(err)) => {
+                    self.lexer_errors.push(err);
+                    next = None;
+                    break;
+                }
 
-            None => next = None,
+                Some(Ok(tok)) => {
+                    next = Some(tok);
+                    break;
+                }
+
+                None => {
+                    next = None;
+                    break;
+                }
+            }
         }
 
         self.tok0 = self.tok1.take();
