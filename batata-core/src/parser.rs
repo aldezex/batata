@@ -5,7 +5,9 @@ mod token;
 
 use crate::ast::{
     self,
-    untyped::{Expression, ExpressionKind, Infix, Module, Parsed, Statement},
+    untyped::{
+        Definition, Expression, ExpressionKind, Infix, Module, Parameter, Parsed, Statement,
+    },
 };
 
 use self::{
@@ -103,6 +105,7 @@ where
         match token.1 {
             Token::Let => self.parse_let_statement(),
             Token::LBrace => self.parse_block_statement(),
+            Token::Fn => self.parse_function_statement(),
             _ => self.parse_expression_statement(token),
         }
     }
@@ -122,6 +125,69 @@ where
         }
 
         Ok(Statement::Block(ast::untyped::Block { statements }))
+    }
+
+    fn parse_function_statement(&mut self) -> Result<Statement, ParseError> {
+        let name = self.expect_identifier()?;
+
+        if !self.peek_token_is(Token::LParen) {
+            return Err(ParseError::InvalidToken(
+                self.tok0.as_ref().unwrap().1.to_string(),
+            ));
+        }
+
+        self.next_token();
+        self.next_token();
+
+        let parameters = self.parse_parameters()?;
+
+        if !self.curr_token_is(Token::LBrace) {
+            return Err(ParseError::InvalidToken(
+                self.tok1.as_ref().unwrap().1.to_string(),
+            ));
+        }
+
+        let body = self.parse_block_statement()?;
+        let body = ast::untyped::Block {
+            statements: vec![body],
+        };
+
+        Ok(Statement::Function(ast::untyped::Function {
+            name,
+            parameters,
+            body,
+        }))
+    }
+
+    fn parse_parameters(&mut self) -> Result<Vec<Parameter>, ParseError> {
+        let mut parameters = Vec::new();
+
+        println!("----> parse_parameters()");
+
+        while self.peek_token_is(Token::Comma) || self.peek_token_is(Token::RParen) {
+            let param = self.extract_parameter()?;
+            parameters.push(param);
+
+            self.next_token();
+            self.next_token();
+        }
+
+        Ok(parameters)
+    }
+
+    fn extract_parameter(&mut self) -> Result<Parameter, ParseError> {
+        let param = match self.tok0.take() {
+            Some(tok) => match tok.1 {
+                Token::Identifier { name } | Token::DiscardIdentifier { name } => Ok(name),
+                _ => Err(ParseError::InvalidToken(tok.1.to_string())),
+            },
+            None => Err(ParseError::UnexpectedEof),
+        };
+
+        match param {
+            Ok(name) => Ok(Parameter { name }),
+            Err(err) => Err(err),
+        }
     }
 
     fn parse_let_statement(&mut self) -> Result<Statement, ParseError> {
@@ -226,6 +292,10 @@ where
 
     fn peek_token_is(&mut self, token: Token) -> bool {
         self.tok1.as_ref().map_or(false, |tok| tok.1 == token)
+    }
+
+    fn curr_token_is(&mut self, token: Token) -> bool {
+        self.tok0.as_ref().map_or(false, |tok| tok.1 == token)
     }
 
     fn current_precedence(&self) -> u8 {

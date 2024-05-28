@@ -32,6 +32,7 @@ pub enum Token {
     Semicolon,
     Colon,
     Dot,
+    Comma,
 
     // operators
     Plus,
@@ -79,6 +80,7 @@ impl Display for Token {
             Token::Semicolon => ";",
             Token::Colon => ":",
             Token::Dot => ".",
+            Token::Comma => ",",
             Token::Plus => "+",
             Token::Minus => "-",
             Token::Star => "*",

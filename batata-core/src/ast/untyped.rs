@@ -85,19 +85,34 @@ pub struct Infix {
 
 pub struct Function {
     pub name: String,
-    pub parameters: Vec<Definition>,
+    pub parameters: Vec<Parameter>,
     pub body: Block,
+}
+
+#[derive(Debug)]
+pub struct Parameter {
+    pub name: String,
 }
 
 impl std::fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut parameters = String::new();
 
-        for parameter in &self.parameters {
+        for (i, parameter) in self.parameters.iter().enumerate() {
             parameters.push_str(&parameter.to_string());
+
+            if i < self.parameters.len() - 1 {
+                parameters.push_str(", ");
+            }
         }
 
         write!(f, "fn {}({}) {}", self.name, parameters, self.body)
+    }
+}
+
+impl std::fmt::Display for Parameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 

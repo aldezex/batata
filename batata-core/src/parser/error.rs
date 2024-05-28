@@ -34,4 +34,6 @@ pub enum ParseError {
     ExpectedInteger(String),
     #[error("Unexpected EOF")]
     UnexpectedEof,
+    #[error("Error parsing function arguments: {0}")]
+    ErrorParsingFunctionArguments(String),
 }

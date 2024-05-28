@@ -105,3 +105,16 @@ fn parse_block_statements() {
         )
     );
 }
+
+#[test]
+fn parse_function() {
+    let input = r#"
+        fn add(x, y) {
+            x + y
+        }
+        "#;
+
+    let parsed = parse_module(input).unwrap();
+    assert_eq!(parsed.module.statements.len(), 1);
+    println!("{}", parsed.module.to_string());
+}

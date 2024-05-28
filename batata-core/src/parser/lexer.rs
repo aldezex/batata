@@ -178,6 +178,11 @@ impl<T: Iterator<Item = (u32, char)>> Lexer<T> {
                 self.add_token(t);
             }
 
+            if c == ',' {
+                let t = self.read_single_char(Token::Comma)?;
+                self.add_token(t);
+            }
+
             // operators
             if c == '+' {
                 let t = self.read_single_char(Token::Plus)?;
