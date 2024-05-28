@@ -36,4 +36,16 @@ pub enum ParseError {
     UnexpectedEof,
     #[error("Error parsing function arguments: {0}")]
     ErrorParsingFunctionArguments(String),
+    #[error("Function arguments should start enclosed in left parenthesis")]
+    FunctionArgumentsStartWithLeftParenthesis,
+    #[error("Function body should start enclosed in left brace")]
+    FunctionBodyStartWithLeftBrace,
+    #[error("Expected parameter name, found: {0}")]
+    ExpectedParameterName(String),
+    #[error("Let statements should have an identifier, which is the name of the variable being declared")]
+    LetStatementsShouldHaveAnIdentifier,
+    #[error("Let statements should be assigned with '=', found: {0}")]
+    LetStatementsAreAssignedWithEqual(String),
+    #[error("Let statements end with a semicolon")]
+    LetStatementsEndWithSemicolon,
 }

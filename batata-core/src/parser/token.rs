@@ -2,7 +2,7 @@ use std::{fmt::Display, str::FromStr};
 
 use super::error::LexicalError;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Identifier { name: String },
     DiscardIdentifier { name: String },

@@ -224,3 +224,68 @@ fn parse_function() {
         })
     )
 }
+
+#[test]
+fn tests_let_and_functions() {
+    let input = r#"
+        let x = 1 + 2 * 3;
+        fn add(x, y) {
+            x + y
+        }
+        "#;
+
+    let parsed = parse_module(input).unwrap();
+    assert_eq!(
+        parsed.module.to_string(),
+        String::from(r#"let x = (1 + (2 * 3));fn add(x, y) {(x + y)}"#)
+    );
+    assert_eq!(
+        parsed.module,
+        Module {
+            statements: vec![
+                Statement::Definition(Definition {
+                    name: "x".to_string(),
+                    value: Expression {
+                        kind: ExpressionKind::Infix(Infix {
+                            left: Box::new(Expression {
+                                kind: ExpressionKind::Integer("1".into())
+                            }),
+                            operator: "+".to_string(),
+                            right: Box::new(Expression {
+                                kind: ExpressionKind::Infix(Infix {
+                                    left: Box::new(Expression {
+                                        kind: ExpressionKind::Integer("2".into())
+                                    }),
+                                    operator: "*".to_string(),
+                                    right: Box::new(Expression {
+                                        kind: ExpressionKind::Integer("3".into())
+                                    })
+                                })
+                            })
+                        })
+                    }
+                }),
+                Statement::Function(Function {
+                    name: "add".to_string(),
+                    parameters: vec![
+                        Parameter { name: "x".into() },
+                        Parameter { name: "y".into() }
+                    ],
+                    body: Block {
+                        statements: vec![Statement::Expression(Expression {
+                            kind: ExpressionKind::Infix(Infix {
+                                left: Box::new(Expression {
+                                    kind: ExpressionKind::Identifier("x".into())
+                                }),
+                                operator: "+".into(),
+                                right: Box::new(Expression {
+                                    kind: ExpressionKind::Identifier("y".into())
+                                })
+                            })
+                        })]
+                    }
+                })
+            ]
+        }
+    )
+}
