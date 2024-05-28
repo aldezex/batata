@@ -6,7 +6,7 @@ mod token;
 use crate::ast::{
     self,
     untyped::{
-        Definition, Expression, ExpressionKind, Infix, Module, Parameter, Parsed, Statement,
+        Block, Definition, Expression, ExpressionKind, Infix, Module, Parameter, Parsed, Statement,
     },
 };
 
@@ -104,13 +104,16 @@ where
     fn parse_statement(&mut self, token: Span) -> Result<Statement, ParseError> {
         match token.1 {
             Token::Let => self.parse_let_statement(),
-            Token::LBrace => self.parse_block_statement(),
+            Token::LBrace => {
+                let block = self.parse_block_statement()?;
+                Ok(Statement::Block(block))
+            }
             Token::Fn => self.parse_function_statement(),
             _ => self.parse_expression_statement(token),
         }
     }
 
-    fn parse_block_statement(&mut self) -> Result<Statement, ParseError> {
+    fn parse_block_statement(&mut self) -> Result<Block, ParseError> {
         self.next_token();
         let mut statements = Vec::new();
 
@@ -124,7 +127,7 @@ where
             self.next_token();
         }
 
-        Ok(Statement::Block(ast::untyped::Block { statements }))
+        Ok(Block { statements })
     }
 
     fn parse_function_statement(&mut self) -> Result<Statement, ParseError> {
@@ -148,9 +151,6 @@ where
         }
 
         let body = self.parse_block_statement()?;
-        let body = ast::untyped::Block {
-            statements: vec![body],
-        };
 
         Ok(Statement::Function(ast::untyped::Function {
             name,

@@ -2,6 +2,7 @@ pub struct Parsed {
     pub module: Module,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Module {
     pub statements: Vec<Statement>,
 }
@@ -18,6 +19,7 @@ impl std::fmt::Display for Module {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Statement {
     Expression(Expression),
     Definition(Definition),
@@ -36,6 +38,7 @@ impl std::fmt::Display for Statement {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Definition {
     pub name: String,
     pub value: Expression,
@@ -47,6 +50,7 @@ impl std::fmt::Display for Definition {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Expression {
     pub kind: ExpressionKind,
 }
@@ -57,6 +61,7 @@ impl std::fmt::Display for Expression {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ExpressionKind {
     Integer(String),
     Infix(Infix),
@@ -77,19 +82,21 @@ impl std::fmt::Display for ExpressionKind {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Infix {
     pub left: Box<Expression>,
     pub operator: String,
     pub right: Box<Expression>,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Function {
     pub name: String,
     pub parameters: Vec<Parameter>,
     pub body: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Parameter {
     pub name: String,
 }
@@ -116,6 +123,7 @@ impl std::fmt::Display for Parameter {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Block {
     pub statements: Vec<Statement>,
 }
