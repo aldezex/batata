@@ -25,6 +25,7 @@ pub enum Statement {
     Definition(Definition),
     Function(Function),
     Block(Block),
+    If(If),
 }
 
 impl std::fmt::Display for Statement {
@@ -34,7 +35,29 @@ impl std::fmt::Display for Statement {
             Statement::Definition(definition) => write!(f, "{}", definition),
             Statement::Function(function) => write!(f, "{}", function),
             Statement::Block(block) => write!(f, "{}", block),
+            Statement::If(if_statement) => write!(f, "{}", if_statement),
         }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct If {
+    pub condition: Expression,
+    pub consequence: Block,
+    pub alternative: Option<Block>,
+}
+
+impl std::fmt::Display for If {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut if_statement = String::new();
+
+        if_statement.push_str(&format!("if {} {}", self.condition, self.consequence));
+
+        if let Some(alternative) = &self.alternative {
+            if_statement.push_str(&format!(" else {}", alternative));
+        }
+
+        write!(f, "{}", if_statement)
     }
 }
 

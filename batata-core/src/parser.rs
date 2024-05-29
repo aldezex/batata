@@ -3,11 +3,9 @@ mod lexer;
 mod tests;
 mod token;
 
-use itertools::peek_nth;
-
 use crate::ast::{
     self,
-    untyped::{Block, Expression, ExpressionKind, Infix, Module, Parameter, Parsed, Statement},
+    untyped::{Block, Expression, ExpressionKind, If, Infix, Module, Parameter, Parsed, Statement},
 };
 
 use self::{
@@ -109,7 +107,47 @@ where
                 Ok(Statement::Block(block))
             }
             Token::Fn => self.parse_function_statement(),
+            Token::If => self.parse_if_statement(),
             _ => self.parse_expression_statement(token),
+        }
+    }
+
+    fn parse_if_statement(&mut self) -> Result<Statement, ParseError> {
+        self.next_token();
+
+        if let Some(token) = self.tok0.take() {
+            let precedence = token.1.get_precedence();
+            let condition = self.parse_expression(token, precedence)?;
+
+            self.next_token();
+            let consequence = self.parse_block_statement()?;
+
+            if let Some(tok) = self.tok0.take() {
+                println!("{:?}", tok);
+                if tok.1 == Token::Else {
+                    self.next_token();
+                    self.next_token();
+
+                    println!("{:?}", self.tok0);
+                    println!("{:?}", self.tok1);
+
+                    let alternative = self.parse_block_statement()?;
+
+                    return Ok(Statement::If(If {
+                        condition,
+                        consequence,
+                        alternative: Some(alternative),
+                    }));
+                }
+            }
+
+            return Ok(Statement::If(If {
+                condition,
+                consequence,
+                alternative: None,
+            }));
+        } else {
+            Err(ParseError::UnexpectedEof)
         }
     }
 

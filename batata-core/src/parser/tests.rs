@@ -1,8 +1,92 @@
 use crate::ast::untyped::{
-    Block, Definition, Expression, ExpressionKind, Function, Infix, Module, Parameter, Statement,
+    Block, Definition, Expression, ExpressionKind, Function, If, Infix, Module, Parameter,
+    Statement,
 };
 
 use super::parse_module;
+
+#[test]
+fn test_if_statement() {
+    let input = r#"if x == 1 {
+        let y = 2;
+    }"#;
+
+    let parsed = parse_module(input).unwrap();
+    assert_eq!(parsed.module.statements.len(), 1);
+    assert_eq!(
+        parsed.module,
+        Module {
+            statements: vec![Statement::If(If {
+                condition: Expression {
+                    kind: ExpressionKind::Infix(Infix {
+                        left: Box::new(Expression {
+                            kind: ExpressionKind::Identifier("x".to_string())
+                        }),
+                        operator: "==".to_string(),
+                        right: Box::new(Expression {
+                            kind: ExpressionKind::Integer("1".to_string())
+                        })
+                    })
+                },
+                consequence: Block {
+                    statements: vec![Statement::Definition(Definition {
+                        name: "y".to_string(),
+                        value: Expression {
+                            kind: ExpressionKind::Integer("2".to_string())
+                        }
+                    })]
+                },
+                alternative: None,
+            })]
+        }
+    );
+}
+
+#[test]
+fn test_if_else() {
+    let input = r#"if x == 1 {
+        let y = 2;
+    } else {
+        let z = 3;
+    }"#;
+
+    let parsed = parse_module(input).unwrap();
+    assert_eq!(parsed.module.statements.len(), 1);
+    assert_eq!(
+        parsed.module,
+        Module {
+            statements: vec![Statement::If(If {
+                condition: Expression {
+                    kind: ExpressionKind::Infix(Infix {
+                        left: Box::new(Expression {
+                            kind: ExpressionKind::Identifier("x".to_string())
+                        }),
+                        operator: "==".to_string(),
+                        right: Box::new(Expression {
+                            kind: ExpressionKind::Integer("1".to_string())
+                        })
+                    })
+                },
+                consequence: Block {
+                    statements: vec![Statement::Definition(Definition {
+                        name: "y".to_string(),
+                        value: Expression {
+                            kind: ExpressionKind::Integer("2".to_string())
+                        }
+                    })]
+                },
+                alternative: Some(Block {
+                    statements: vec![Statement::Definition(Definition {
+                        name: "z".to_string(),
+                        value: Expression {
+                            kind: ExpressionKind::Integer("3".to_string())
+                        }
+                    })]
+                }),
+            })]
+        }
+    );
+}
 
 #[test]
 fn test_parse_module() {
